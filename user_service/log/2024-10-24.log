@@ -1,0 +1,100 @@
+2024-10-24 19:49:38,251 - user_service.utils.logger_utils - INFO - Flask 应用已创建并配置完成
+2024-10-24 19:49:38,255 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2024-10-24 19:49:38,255 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2024-10-24 19:49:45,576 - user_service.utils.logger_utils - INFO - 注册请求数据: {'username': '18742040738', 'password': '18742040738'}
+2024-10-24 19:49:45,580 - user_service.utils.logger_utils - WARNING - 用户注册失败: 用户已存在
+2024-10-24 19:49:45,581 - user_service.utils.logger_utils - INFO - 注册响应数据: ({'error': '用户已存在'}, 400)
+2024-10-24 19:49:45,581 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 19:49:45] "[31m[1mPOST /user/register HTTP/1.1[0m" 400 -
+2024-10-24 19:50:40,193 - user_service.utils.logger_utils - INFO - Flask 应用已创建并配置完成
+2024-10-24 19:50:40,197 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2024-10-24 19:50:40,197 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2024-10-24 19:50:46,853 - user_service.utils.logger_utils - INFO - 注册请求数据: {'username': '18742040738', 'password': '18742040738'}
+2024-10-24 19:50:46,855 - user_service.utils.logger_utils - WARNING - 用户注册失败: 用户已存在
+2024-10-24 19:50:46,855 - user_service.utils.logger_utils - INFO - 注册响应数据: ({'error': '用户已存在'}, 400)
+2024-10-24 19:50:46,855 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 19:50:46] "[31m[1mPOST /user/register HTTP/1.1[0m" 400 -
+2024-10-24 20:01:51,993 - app - ERROR - Exception on /user/get/5 [GET]
+Traceback (most recent call last):
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\user_service\utils\jwt_utils.py", line 68, in decorated
+    decoded_payload, error_response = jwt_manager.verify_token(token)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: too many values to unpack (expected 2)
+2024-10-24 20:01:51,997 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 20:01:51] "[35m[1mGET /user/get/5 HTTP/1.1[0m" 500 -
+2024-10-24 20:02:31,498 - user_service.utils.logger_utils - INFO - 注册请求数据: {'username': '18742040738', 'password': '18742040738'}
+2024-10-24 20:02:31,500 - user_service.utils.logger_utils - WARNING - 用户注册失败: 用户已存在
+2024-10-24 20:02:31,501 - user_service.utils.logger_utils - INFO - 注册响应数据: ({'error': '用户已存在'}, 400)
+2024-10-24 20:02:31,501 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 20:02:31] "[31m[1mPOST /user/register HTTP/1.1[0m" 400 -
+2024-10-24 20:02:40,329 - app - ERROR - Exception on /user/update/5 [PUT]
+Traceback (most recent call last):
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\user_service\utils\jwt_utils.py", line 68, in decorated
+    decoded_payload, error_response = jwt_manager.verify_token(token)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: too many values to unpack (expected 2)
+2024-10-24 20:02:40,332 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 20:02:40] "[35m[1mPUT /user/update/5 HTTP/1.1[0m" 500 -
+2024-10-24 20:03:26,032 - user_service.utils.logger_utils - INFO - Flask 应用已创建并配置完成
+2024-10-24 20:03:26,035 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2024-10-24 20:03:26,035 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2024-10-24 20:03:31,312 - app - ERROR - Exception on /user/update/5 [PUT]
+Traceback (most recent call last):
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 1473, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 882, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 880, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\.venv\Lib\site-packages\flask\app.py", line 865, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yj998\python_project\to-github\user_service\utils\jwt_utils.py", line 68, in decorated
+    decoded_payload, error_response = jwt_manager.verify_token(token)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: too many values to unpack (expected 2)
+2024-10-24 20:03:31,316 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 20:03:31] "[35m[1mPUT /user/update/5 HTTP/1.1[0m" 500 -
+2024-10-24 20:04:35,664 - user_service.utils.logger_utils - INFO - 登录请求数据: {'username': '18742040738', 'password': '18742040738'}
+2024-10-24 20:04:35,669 - user_service.utils.logger_utils - INFO - 用户登录成功
+2024-10-24 20:04:35,669 - user_service.utils.logger_utils - INFO - 登录响应数据: ({'message': '用户登录成功', 'token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6IjE4NzQyMDQwNzM4IiwiZXhwIjoxNzI5NzczMjc1fQ.Ha61isJuDWxT61rNBX1Qe3_-Yl60159qyMozNQN2P3M'}, 200)
+2024-10-24 20:04:35,670 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 20:04:35] "POST /user/login HTTP/1.1" 200 -
+2024-10-24 20:04:41,675 - user_service.utils.logger_utils - INFO - 查询用户成功
+2024-10-24 20:04:41,675 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 20:04:41] "GET /user/get/5 HTTP/1.1" 200 -
+2024-10-24 20:05:51,050 - user_service.utils.logger_utils - INFO - Flask 应用已创建并配置完成
+2024-10-24 20:05:51,054 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2024-10-24 20:05:51,054 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+2024-10-24 20:06:06,680 - user_service.utils.logger_utils - INFO - 用户 ID 5 信息更新成功
+2024-10-24 20:06:06,680 - user_service.utils.logger_utils - INFO - 用户信息更新成功
+2024-10-24 20:06:06,680 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 20:06:06] "PUT /user/update/5 HTTP/1.1" 200 -
+2024-10-24 20:06:12,834 - user_service.utils.logger_utils - INFO - 查询用户成功
+2024-10-24 20:06:12,835 - werkzeug - INFO - 127.0.0.1 - - [24/Oct/2024 20:06:12] "GET /user/get/5 HTTP/1.1" 200 -
+2024-10-24 21:01:22,234 - user_service.utils.logger_utils - INFO - Flask 应用已创建并配置完成
+2024-10-24 21:01:22,239 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+2024-10-24 21:01:22,239 - werkzeug - INFO - [33mPress CTRL+C to quit[0m

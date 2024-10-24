@@ -1,0 +1,6 @@
+.venv/
+.log/
+.test/
+__pycache__/
+.idea/
+./github.py
