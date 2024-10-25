@@ -135,3 +135,52 @@ def service_update_user_by_id(user_id, data):
             connection.rollback()
             logger.error(f"更新用户 ID {user_id} 信息失败: {err}")
             raise ValueError("更新用户信息失败: {}".format(err))
+
+
+def save_user_appraisal(username, github_id, message, point):
+    try:
+        with get_cursor(dictionary=True) as cursor:
+            # 查询 user_id
+            cursor.execute(
+                """
+                SELECT id FROM user WHERE username = %s
+                """,
+                (username,)
+            )
+            user = cursor.fetchone()
+
+            if not user:
+                logger.error(f"用户 {username} 不存在")
+                return False
+
+            user_id = user['id']
+
+            # 插入评价数据
+            cursor.execute(
+                """
+                INSERT INTO appraisal (user_id, github_id, rating, message)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (user_id, github_id, point, message)
+            )
+            connection.commit()
+        return True
+    except Exception as e:
+        logger.error(f"保存用户评价数据失败: {e}")
+        return False
+
+
+def get_user_appraisals(github_id):
+    try:
+        with get_cursor(dictionary=True) as cursor:
+            cursor.execute(
+                """
+                SELECT * FROM appraisal WHERE github_id = %s
+                """,
+                (github_id,)
+            )
+            appraisals = cursor.fetchall()
+        return appraisals
+    except Exception as e:
+        logger.error(f"获取用户评估数据失败: {e}")
+        return None

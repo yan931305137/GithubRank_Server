@@ -19,4 +19,4 @@ def create_app():
 if __name__ == '__main__':
     app = create_app()
     # 使用配置文件中的调试模式
-    app.run(debug=Config.DEBUG, port=5001)
+    app.run(debug=Config.DEBUG, port=9001)

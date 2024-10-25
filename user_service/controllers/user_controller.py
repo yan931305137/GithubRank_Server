@@ -1,10 +1,10 @@
-from flask import request
+from flask import request, jsonify
 
 from user_service.services.user_service import (check_user_credentials,
                                                 create_user,
                                                 delete_user_by_id as service_delete_user_by_id,
                                                 get_user_by_id as service_get_user_by_id,
-                                                service_update_user_by_id)
+                                                service_update_user_by_id, get_user_appraisals, save_user_appraisal)
 from user_service.utils.cryp_utils import encrypt_password
 from user_service.utils.jwt_utils import jwt_manager
 from user_service.utils.logger_utils import logger
@@ -114,7 +114,8 @@ def update_user_by_id(user_id, data):
         username = decoded_payload.get('username')
 
         if username != data.get('username'):
-            logger.warning(f"用户名错误: 用户ID={user_id}, 提供的用户名={data.get('username')}, 令牌中的用户名={username}")
+            logger.warning(
+                f"用户名错误: 用户ID={user_id}, 提供的用户名={data.get('username')}, 令牌中的用户名={username}")
             return {'error': '用户名错误'}, 400
 
         if 'password' in data and data['password']:
@@ -135,3 +136,53 @@ def update_user_by_id(user_id, data):
     except Exception as e:
         logger.error(f"更新用户信息时出错: 用户ID={user_id}, 错误信息: {e}")
         return {'error': '更新用户信息失败'}, 500
+
+
+def save_appraisal(username, data):
+    """
+    保存评估数据。
+    :param username: 用户名
+    :param data: 包含 'github_id'、'message' 和 'point' 的评估数据字典
+    """
+    try:
+        logger.info(f"开始保存评估数据，用户名: {username}, 数据: {data}")
+
+        # 获取数据中的必要字段
+        github_id = data.get('github_id')
+        message = data.get('message')
+        point = data.get('point')
+
+        # 检查必要字段是否存在
+        if not all([github_id, message, point]):
+            logger.error("评估数据缺失必要字段")
+            return jsonify({'error': '评估数据缺失必要字段'}), 400
+
+        # 调用保存函数
+        result = save_user_appraisal(username, github_id, message, point)
+
+        if result:
+            logger.info("评估数据保存成功")
+            return {'message': '评估数据保存成功'}, 201
+        else:
+            logger.error("评估数据保存失败，可能是用户不存在")
+            return {'error': '评估数据保存失败'}, 400
+
+    except Exception as e:
+        logger.error(f"保存评估数据失败: {e}")
+        return {'error': '服务器内部错误'}, 500
+
+
+def get_appraisals(github_id):
+    """
+    获取用户的所有评估。
+    :param github_id:
+    :param info_id: 用户ID
+    """
+    try:
+        logger.info(f"开始获取用户评估，用户ID: {github_id}")
+        appraisals = get_user_appraisals(github_id)
+        logger.info(f"成功获取用户评估: {appraisals}")
+        return appraisals, 200
+    except Exception as e:
+        logger.error(f"获取用户评估失败，用户ID: {github_id}, 错误: {e}")
+        return jsonify({'error': '获取用户评估失败'}), 500

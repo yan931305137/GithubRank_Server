@@ -1,11 +1,12 @@
 from flask import Blueprint, request, jsonify
+
 from user_service.utils.logger_utils import logger
 
 from user_service.controllers.user_controller import (
-    login_user, register_user, delete_user_by_id, get_user_by_id, update_user_by_id
+    login_user, register_user, delete_user_by_id, get_user_by_id, update_user_by_id, save_appraisal, get_appraisals
 )
 
-from user_service.utils.jwt_utils import token_required
+from user_service.utils.jwt_utils import token_required, jwt_manager
 
 user_bp = Blueprint('user_bp', __name__)
 
@@ -94,3 +95,51 @@ def update_user(user_id):
     else:
         logger.error("用户更新失败")
     return jsonify(response[0]), response[1]
+
+
+@user_bp.route('/appraise', methods=['POST'])
+@token_required
+def appraise():
+    """
+    用户对github用户的评价
+    :return: 响应数据
+    """
+    # 检查Authorization头部的token
+    token = request.headers.get('Authorization')
+    if not token:
+        logger.warning(f"请求路径: {request.path} - 缺少Authorization token")
+        return jsonify({"error": "缺少Authorization token"}), 401
+
+    # 验证token
+    ver, err = jwt_manager.verify_token(token)
+    username = ver.get('username')
+    print(username)
+    if err:
+        logger.warning(f"无效的Authorization token")
+        return jsonify({"error": "无效的Authorization token"}), 403
+    data = request.json
+    logger.info(f"用户评价请求已收到，数据: {username, data}")
+    response = save_appraisal(username, data)
+    logger.info("用户评价请求处理完毕")
+    return jsonify(response[0]), response[1]
+
+
+@user_bp.route('/getAppraise', methods=['GET'])
+def get_appraise():
+    """
+    获取用户评价
+    :return: JSON响应数据
+    """
+    github_id = request.args.get('github_id')
+    if not github_id:
+        logger.error(f"请求路径: {request.path} - 缺少github_id参数")
+        return jsonify({"error": "缺少github_id参数"}), 400
+
+    try:
+        # 获取用户评价
+        response_data = get_appraisals(github_id)
+        logger.info(f"获取用户评价请求处理完毕，user: {github_id}")
+        return response_data
+    except Exception as e:
+        logger.error(f"获取用户评价时发生错误，user: {github_id}，错误信息: {str(e)}")
+        return jsonify({"error": "服务器内部错误"}), 500

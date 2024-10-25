@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 
-from info_service.controllers.info_controller import get_github_rank, get_user_info, save_appraisal, get_appraisals
+from info_service.controllers.info_controller import get_github_rank, get_user_info, get_user_repos_info, get_user_total_info, get_user_tech_info, get_user_guess_nation_info, get_user_summary_info
 from info_service.utils.logger_utils import logger
 
 from info_service.utils.jwt_utils import token_required
@@ -21,40 +21,100 @@ def rank():
 
 
 @info_bp.route('/userInfo', methods=['GET'])
-def userInfo():
+def user_info():
     """
     获取单个github用户信息
     :return: 响应数据
     """
+    github_id = request.args.get('github_id')
+    if not github_id:
+        logger.error(request.path)
+        return jsonify({"error": "缺少github_id参数"}), 400
+
+    logger.info(f"获取用户信息请求已收到，github_id: {github_id}")
+    response = get_user_info(github_id)
+    logger.info(f"获取用户信息请求处理完毕，github_id: {github_id}")
+    return jsonify(response[0]), response[1]
+
+
+@info_bp.route('/reposInfo', methods=['GET'])
+def repos_info():
+    """
+    获取单个github用户项目信息
+    :return: 响应数据
+    """
+    github_id = request.args.get('github_id')
+    if not github_id:
+        logger.error(request.path)
+        return jsonify({"error": "缺少github_id参数"}), 400
+
+    logger.info(f"获取用户项目信息请求已收到，github_id: {github_id}")
+    response = get_user_repos_info(github_id)
+    logger.info(f"获取用户项目信息请求处理完毕，github_id: {github_id}")
+    return jsonify(response[0]), response[1]
+
+
+@info_bp.route('/total', methods=['GET'])
+def total_info():
+    """
+    获取单个github用户项目stars等总数信息
+    :return: 响应数据
+    """
+    github_id = request.args.get('github_id')
+    if not github_id:
+        logger.error(request.path)
+        return jsonify({"error": "缺少github_id参数"}), 400
     user_id = request.args.get('github_id')
-    logger.info(f"获取用户信息请求已收到，github_id: {user_id}")
-    response = get_user_info(user_id)
-    logger.info(f"获取用户信息请求处理完毕，github_id: {user_id}")
+    logger.info(f"获取用户项目总数信息请求已收到，github_id: {user_id}")
+    response = get_user_total_info(user_id)
+    logger.info(f"获取用户项目总数信息请求处理完毕，github_id: {user_id}")
     return jsonify(response[0]), response[1]
 
 
-@info_bp.route('/appraise', methods=['POST'])
-@token_required
-def appraise():
+@info_bp.route('/techInfo', methods=['GET'])
+def tech_info():
     """
-    用户对github用户的评价
+    获取单个github用户技术栈信息
     :return: 响应数据
     """
-    data = request.json
-    logger.info(f"用户评价请求已收到，数据: {data}")
-    response = save_appraisal(data)
-    logger.info("用户评价请求处理完毕")
+    github_id = request.args.get('github_id')
+    if not github_id:
+        logger.error(request.path)
+        return jsonify({"error": "缺少github_id参数"}), 400
+    logger.info(f"获取用户技术栈信息请求已收到，github_id: {github_id}")
+    response = get_user_tech_info(github_id)
+    logger.info(f"获取用户技术栈信息请求处理完毕，github_id: {github_id}")
     return jsonify(response[0]), response[1]
 
 
-@info_bp.route('/getAppraise', methods=['GET'])
-def getAppraise():
+@info_bp.route('/guessNation', methods=['GET'])
+def guess_nation():
     """
-    获取用户评价
+    获取单个github用户国家信息猜测
     :return: 响应数据
     """
-    user_id = request.args.get('user')
-    logger.info(f"获取用户评价请求已收到，user: {user_id}")
-    response = get_appraisals(user_id)
-    logger.info(f"获取用户评价请求处理完毕，user: {user_id}")
+    github_id = request.args.get('github_id')
+    if not github_id:
+        logger.error(request.path)
+        return jsonify({"error": "缺少github_id参数"}), 400
+    logger.info(f"获取用户国家信息猜测请求已收到，github_id: {github_id}")
+    response = get_user_guess_nation_info(github_id)
+    logger.info(f"获取用户国家信息猜测请求处理完毕，github_id: {github_id}")
     return jsonify(response[0]), response[1]
+
+
+@info_bp.route('/summary', methods=['GET'])
+def summary():
+    """
+    获取单个github用户基于gpt的评价信息
+    :return: 响应数据
+    """
+    github_id = request.args.get('github_id')
+    if not github_id:
+        logger.error(request.path)
+        return jsonify({"error": "缺少github_id参数"}), 400
+    logger.info(f"获取用户评价信息请求已收到，github_id: {github_id}")
+    response = get_user_summary_info(github_id)
+    logger.info(f"获取用户评价信息请求处理完毕，github_id: {github_id}")
+    return jsonify(response[0]), response[1]
+
