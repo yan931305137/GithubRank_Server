@@ -79,7 +79,7 @@ def delete_user_by_id(user_id):
     :param user_id: 用户ID
     :raises ValueError: 如果用户未找到或删除失败
     """
-    with get_cursor() as cursor:
+    with get_cursor(dictionary=True) as cursor:
         try:
             cursor.execute("DELETE FROM user WHERE id = %s", (user_id,))
             if cursor.rowcount == 0:
@@ -87,10 +87,11 @@ def delete_user_by_id(user_id):
                 raise ValueError("用户未找到")
             connection.commit()
             logger.info(f"用户 ID {user_id} 删除成功")
+            return True
         except mysql.connector.Error as err:
             connection.rollback()
             logger.error(f"删除用户 ID {user_id} 失败: {err}")
-            raise
+            return False
 
 
 def get_user_by_id(user_id):

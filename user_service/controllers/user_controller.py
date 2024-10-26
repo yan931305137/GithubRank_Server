@@ -1,5 +1,3 @@
-from flask import request, jsonify
-
 from user_service.services.user_service import (check_user_credentials,
                                                 create_user,
                                                 delete_user_by_id as service_delete_user_by_id,
@@ -74,9 +72,12 @@ def delete_user_by_id(user_id):
     :return: 响应数据和状态码
     """
     try:
-        service_delete_user_by_id(user_id)
-        logger.info(f"用户删除成功: 用户ID={user_id}")
-        return {'message': f'用户删除成功'}, 200
+        if service_delete_user_by_id(user_id):
+            logger.info(f"用户删除成功: 用户ID={user_id}")
+            return {'message': f'用户删除成功'}, 200
+        else:
+            logger.warning(f"用户删除失败: 用户ID={user_id}")
+            return {'error':f'用户删除失败'}, 400
     except ValueError as e:
         logger.warning(f"用户删除失败: 用户ID={user_id}, 错误信息: {str(e)}")
         return {'error': str(e)}, 404
@@ -105,22 +106,8 @@ def update_user_by_id(user_id, data):
     :return: 响应数据和状态码
     """
     try:
-        # 验证数据
-        token = request.headers.get('Authorization')
-        decoded_payload, error_response = jwt_manager.verify_token(token)
-        if error_response:
-            logger.warning(f"更新用户信息失败: 用户ID={user_id}, 错误信息: {error_response}")
-            return error_response
-        username = decoded_payload.get('username')
-
-        if username != data.get('username'):
-            logger.warning(
-                f"用户名错误: 用户ID={user_id}, 提供的用户名={data.get('username')}, 令牌中的用户名={username}")
-            return {'error': '用户名错误'}, 400
-
         if 'password' in data and data['password']:
             data['password'] = encrypt_password(data['password'])
-
         validation_result = validate_user_data(data)
         if not isinstance(validation_result, tuple):
             return validation_result
@@ -155,7 +142,7 @@ def save_appraisal(username, data):
         # 检查必要字段是否存在
         if not all([github_id, message, point]):
             logger.error("评估数据缺失必要字段")
-            return jsonify({'error': '评估数据缺失必要字段'}), 400
+            return {'error': '评估数据缺失必要字段'}, 400
 
         # 调用保存函数
         result = save_user_appraisal(username, github_id, message, point)
@@ -182,7 +169,7 @@ def get_appraisals(github_id):
         logger.info(f"开始获取用户评估，用户ID: {github_id}")
         appraisals = get_user_appraisals(github_id)
         logger.info(f"成功获取用户评估: {appraisals}")
-        return appraisals, 200
+        return appraisals,200
     except Exception as e:
         logger.error(f"获取用户评估失败，用户ID: {github_id}, 错误: {e}")
-        return jsonify({'error': '获取用户评估失败'}), 500
+        return {'error': '获取用户评估失败'}, 500

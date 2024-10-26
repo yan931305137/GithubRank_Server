@@ -4,9 +4,9 @@ import cohere
 import langid
 import requests
 import json
-from flask import jsonify
 from concurrent.futures import ThreadPoolExecutor
 import urllib3
+from fastapi import HTTPException
 
 from info_service.config.cohereConfig import Config
 from info_service.config.githubToken import Config
@@ -50,7 +50,7 @@ def get_github_rank():
         return rank_data, 200
     except Exception as e:
         logger.error(f"获取GitHub排名信息失败: {e}")
-        return jsonify({'error': '获取GitHub排名信息失败'}), 500
+        return {'error': '获取GitHub排名信息失败'}, 500
 
 
 def get_user_info(info_id):
@@ -73,13 +73,13 @@ def get_user_info(info_id):
             if save_response:
                 return user_data, 200
             else:
-                return jsonify({'error': '保存用户信息失败'}), 500
+                return {'error': '保存用户信息失败'}, 500
         else:
             logger.error(f"获取用户信息失败: 用户信息状态码 {user_response.status_code}")
-            return jsonify({'error': '获取用户信息失败'}), user_response.status_code
+            return {'error': '获取用户信息失败'}, user_response.status_code
     except Exception as e:
         logger.error(f"获取用户信息失败，用户ID: {info_id}, 错误: {e}")
-        return jsonify({'error': '获取用户信息失败'}), 500
+        return {'error': '获取用户信息失败'}, 500
 
 
 def get_user_repos_info(info_id):
@@ -101,13 +101,13 @@ def get_user_repos_info(info_id):
             if save_response:
                 return user_data, 200
             else:
-                return jsonify({'error': '保存用户项目信息失败'}), 500
+                return {'error': '保存用户项目信息失败'}, 500
         else:
             logger.error(f"获取用户项目信息失败: 用户项目信息状态码 {user_response.status_code}")
-            return jsonify({'error': '获取用户项目信息失败'}), user_response.status_code
+            return {'error': '获取用户项目信息失败'}, user_response.status_code
     except Exception as e:
         logger.error(f"获取用户项目信息失败，用户ID: {info_id}, 错误: {e}")
-        return jsonify({'error': '获取用户项目信息失败'}), 500
+        return {'error': '获取用户项目信息失败'}, 500
 
 
 def get_user_total_info(info_id):
@@ -121,9 +121,6 @@ def get_user_total_info(info_id):
         headers = {'User-Agent': get_random_user_agent(),
                    'Authorization': f'token {Config.token}'
                    } if Config.token else {}
-        adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
-        session.mount("https://", adapter)
-        session.mount("http://", adapter)
 
         total_commits, total_prs, total_issues, total_stars = 0, 0, 0, 0
 
@@ -170,7 +167,7 @@ def get_user_total_info(info_id):
         if save_response:
             return total_info, 200
         else:
-            return jsonify({'error': '保存用户项目信息失败'}), 500
+            return {'error': '保存用户项目信息失败'}, 500
     except Exception as e:
         logger.error(f"获取用户总信息失败，用户ID: {info_id}, 错误: {e}")
         return {'error': '获取用户总信息失败'}, 500
@@ -230,11 +227,11 @@ def get_user_tech_info(info_id):
         if save_response:
             return language_details, 200
         else:
-            return jsonify({'error': '保存用户技术信息失败'}), 500
+            return {'error': '保存用户技术信息失败'}, 500
 
     except Exception as e:
         logger.error(f"获取用户技术信息失败，用户ID: {info_id}, 错误: {e}")
-        return jsonify({'error': '获取用户技术信息失败'}), 500
+        return {'error': '获取用户技术信息失败'}, 500
 
 
 def get_user_guess_nation_info(username):
@@ -326,10 +323,10 @@ def get_user_guess_nation_info(username):
 
     except requests.exceptions.RequestException as e:
         logger.error(f"获取 GitHub 用户信息失败: {e}")
-        return jsonify({'error': '获取 GitHub 用户信息失败'}), 500
+        return {'error': '获取 GitHub 用户信息失败'}, 500
     except Exception as e:
         logger.error(f"猜测用户国家信息失败，用户名: {username}, 错误: {e}")
-        return jsonify({'error': '猜测用户国家信息失败'}), 500
+        return {'error': '猜测用户国家信息失败'}, 500
 
 
 def get_user_summary_info(username):
@@ -386,10 +383,10 @@ def get_user_summary_info(username):
 
     except cohere.CohereError as e:
         logger.error(f"Cohere API 调用失败: {e}")
-        return jsonify({'error': '调用 Cohere API 生成摘要失败'}), 500
+        return {'error': '调用 Cohere API 生成摘要失败'}, 500
     except Exception as e:
         logger.error(f"获取用户总结信息失败，用户ID: {username}, 错误: {e}")
-        return jsonify({'error': '获取用户总结信息失败'}), 500
+        return {'error': '获取用户总结信息失败'}, 500
 
 
 def get_evaluate_info(username):

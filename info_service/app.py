@@ -1,26 +1,34 @@
-from flask import Flask
-from info_service.utils.nacos_utils import register_service_to_nacos
-from routes.info_routes import info_bp
-from info_service.config.config import Config
+from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
+
+from info_service.routes.info_routes import info_bp
 from info_service.utils.logger_utils import logger
+from info_service.utils.nacos_utils import register_service_to_nacos
+import uvicorn
 
 
-# 创建并配置 Flask 应用的函数
+# 创建并配置 FastAPI 应用的函数 http://127.0.0.1:9002/docs#/
 def create_app():
-    app = Flask(__name__)
-    app.config.from_object(Config)
-    app.register_blueprint(info_bp, url_prefix='/info')
+    app = FastAPI()
+    app.include_router(info_bp, prefix='/info')
 
-    logger.info("Flask 应用已创建并配置完成")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://127.0.0.1:8888"],  # 只允许来自主应用的请求
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    logger.info("FastAPI 应用已创建并配置完成")
     return app
 
 
-if __name__ == '__main__':
-    app = create_app()
+app = create_app()
 
-    # 注册服务
+if __name__ == '__main__':
     register_status = register_service_to_nacos("info_server", "127.0.0.1", 9002)
     logger.info(f"服务注册状态: {'成功' if register_status else '失败'}")
 
     # 使用配置文件中的调试模式
-    app.run(debug=Config.DEBUG, port=9002)
+    uvicorn.run(app, host="127.0.0.1", port=9002)

@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 import jwt
-from flask import jsonify, request
 from functools import wraps
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 
 class JWTManager:
@@ -40,10 +41,10 @@ class JWTManager:
             return decoded_payload, None
         except jwt.ExpiredSignatureError:
             # 处理过期的签名
-            return None, jsonify({'message': '令牌已过期!'}), 403  # 修改此行
+            return None, {'message': '令牌已过期!'}, 403  # 修改此行
         except jwt.InvalidTokenError:
             # 处理无效的令牌
-            return None, jsonify({'message': '无效的令牌!'}), 403  # 修改此行
+            return None, {'message': '无效的令牌!'}, 403  # 修改此行
 
 
 # 初始化JWT管理器
@@ -58,17 +59,18 @@ def token_required(f):
     """
 
     @wraps(f)
-    def decorated(*args, **kwargs):
-        # 从请求头中获取令牌
+    async def decorated(request: Request, *args, **kwargs):
+        # 确保从请求中正确获取 token
         token = request.headers.get('Authorization')
         if not token:
-            # 如果令牌缺失，返回错误信息
-            return jsonify({'message': '令牌缺失!'}), 403
-        # 验证令牌
-        decoded_payload, error_response = jwt_manager.verify_token(token)
-        if error_response:
-            # 如果解码失败，返回错误信息
-            return error_response
-        return f(*args, **kwargs)
+            return JSONResponse(content={"error": "缺少Authorization token"}, status_code=401)
+
+        # 验证 token
+        ver, err = jwt_manager.verify_token(token)
+        if err:
+            return JSONResponse(content={"error": "无效的Authorization token"}, status_code=403)
+
+        # 确保传递正确的参数给被装饰的函数
+        return await f(request, *args, **kwargs)
 
     return decorated

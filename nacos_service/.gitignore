@@ -3,7 +3,8 @@
 .test/
 __pycache__/
 .idea/
-app.py
+github.py
 docker-compose.yml
 result.json
 data/
+nacos-data/
