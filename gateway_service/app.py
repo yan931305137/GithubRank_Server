@@ -1,4 +1,5 @@
 from flask import Flask
+
 from routes.gateway_routes import gateway_bp
 
 # 创建Flask应用实例

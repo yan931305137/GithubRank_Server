@@ -4,7 +4,6 @@ from urllib.parse import urljoin
 import logging
 import time  # 用于重试机制
 
-
 def forward_request(service, path, query_params):
     """
     转发请求到指定的服务
@@ -45,12 +44,12 @@ def forward_request(service, path, query_params):
     logging.debug(f"请求头: {headers}")
 
     max_retries = 3  # 最大重试次数
-    timeout_duration = 10  # 每次请求的超时时间
+    timeout_duration = 600  # 每次请求的超时时间设置为60秒
 
     for attempt in range(max_retries):
         try:
             # 发起请求
-            logging.info(f"转发请求到 {url} 使用方法 {method} 尝试次数: {attempt + 1}")
+            logging.info(f"转发请求到 {url} 使用方法 {method} 尝试次数: {attempt + 1}，超时时间: {timeout_duration}秒")
             response = requests.request(method, url, headers=headers, data=data, params=query_params,
                                         timeout=timeout_duration)
 

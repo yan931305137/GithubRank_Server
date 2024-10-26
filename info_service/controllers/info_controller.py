@@ -1,19 +1,23 @@
+import re
+
 import cohere
 import langid
 import requests
 import json
 from flask import jsonify
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 import urllib3
 
-from info_service.config.cohereConfig import COHEREKEY
+from info_service.config.cohereConfig import Config
+from info_service.config.githubToken import Config
 from info_service.utils.logger_utils import logger
 from info_service.services.info_service import get_rank_data, save_user_data, \
     save_user_reops_data, save_user_total_info_data, save_user_tech_info_data, save_user_guess_nation_info_data, \
-    save_user_summary_info_data, get_github_id
+    save_user_summary_info_data, get_github_id, save_evaluate_info
 
 from info_service.utils.agent_utils import get_random_user_agent
-from info_service.config.githubConfig import GITHUB_USER_URL, GITHUB_REPOS_URL, GITHUB_EVENTS_URL
+from info_service.config.githubConfig import GITHUB_USER_URL, GITHUB_REPOS_URL, GITHUB_EVENTS_URL, \
+    GITHUB_CONTRIBUTORS_URL, GITHUB_COMMITS_URL
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -57,7 +61,9 @@ def get_user_info(info_id):
     try:
         user_url = GITHUB_USER_URL.format(username=info_id)
         session = requests.Session()
-        headers = {'User-Agent': get_random_user_agent()}
+        headers = {'User-Agent': get_random_user_agent(),
+                   'Authorization': f'token {Config.token}'
+                   } if Config.token else {}
 
         user_response = session.get(user_url, headers=headers, verify=False)
         if user_response.status_code == 200:
@@ -84,7 +90,9 @@ def get_user_repos_info(info_id):
     try:
         user_url = GITHUB_REPOS_URL.format(username=info_id)
         session = requests.Session()
-        headers = {'User-Agent': get_random_user_agent()}
+        headers = {'User-Agent': get_random_user_agent(),
+                   'Authorization': f'token {Config.token}'
+                   } if Config.token else {}
         user_response = session.get(user_url, headers=headers, verify=False)
         if user_response.status_code == 200:
             user_data = user_response.json()
@@ -110,7 +118,9 @@ def get_user_total_info(info_id):
     try:
         logger.info(f"开始获取用户总信息，用户ID: {info_id}")
         session = requests.Session()
-        headers = {'User-Agent': get_random_user_agent()}
+        headers = {'User-Agent': get_random_user_agent(),
+                   'Authorization': f'token {Config.token}'
+                   } if Config.token else {}
         adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
         session.mount("https://", adapter)
         session.mount("http://", adapter)
@@ -183,7 +193,10 @@ def get_user_tech_info(info_id):
         # 遍历用户所有仓库，获取每个仓库的语言统计信息
         for repo in repos:
             languages_url = repo.get("languages_url")
-            headers = {'User-Agent': get_random_user_agent()}
+            headers = {'User-Agent': get_random_user_agent(),
+                       'Authorization': f'token {Config.token}'
+                       } if Config.token else {}
+
             response = requests.get(languages_url, headers=headers)
 
             if response.status_code == 200:
@@ -357,7 +370,7 @@ def get_user_summary_info(username):
         )
 
         # 初始化 Cohere 客户端并生成摘要
-        co = cohere.Client(COHEREKEY)
+        co = cohere.Client(Config.COHEREKEY)
         response = co.generate(
             model='command',
             prompt=prompt,
@@ -378,3 +391,61 @@ def get_user_summary_info(username):
         logger.error(f"获取用户总结信息失败，用户ID: {username}, 错误: {e}")
         return jsonify({'error': '获取用户总结信息失败'}), 500
 
+
+def get_evaluate_info(username):
+    try:
+        headers = {'User-Agent': get_random_user_agent(),
+                   'Authorization': f'token {Config.token}'
+                   } if Config.token else {}
+        result = get_github_id(username)  # 需要确保此函数已定义
+        repos = json.loads(result.get('repos_info', '[]'))
+        total_score = 0
+
+        for repo in repos:
+            contributors_url = GITHUB_CONTRIBUTORS_URL.format(username=username, repo=repo['name'])
+            contributors_response = requests.get(contributors_url, headers=headers)
+            contributors = contributors_response.json() if contributors_response.status_code == 200 else []
+            if len(contributors) > 1:  # 协作加分
+                total_score += 2
+
+            readme_url = repo['contents_url'].replace('{+path}', 'README.md')
+            readme_response = requests.get(readme_url, headers=headers)
+            has_readme = readme_response.status_code == 200
+            naming_convention_score = 1 if re.search(r"[A-Z][a-z]*", repo['name']) else 0
+            total_score += 1 + has_readme + naming_convention_score
+
+            commits_url = GITHUB_COMMITS_URL.format(username=username, repo=repo['name'])
+            commits_response = requests.get(commits_url, headers=headers)
+            if commits_response.status_code == 200:
+                commits = commits_response.json()
+                total_score += len(commits)
+
+        if total_score >= 90:
+            rating = "SSS"
+        elif total_score >= 80:
+            rating = "SS"
+        elif total_score >= 70:
+            rating = "S"
+        elif total_score >= 60:
+            rating = "A"
+        elif total_score >= 40:
+            rating = "B"
+        elif total_score >= 15:
+            rating = "C"
+        elif total_score >= 5:
+            rating = "D"
+        else:
+            rating = "F"
+        logger.info(f"用户: {username} 评价: {rating} 评分: {total_score}")
+
+        # 如果 save_evaluate_info 在项目中定义，可使用；否则用 json.dumps 代替 jsonify
+        save_evaluate_info(username, json.dumps({"evaluate": rating, "score": total_score}))
+
+        return {"evaluate": rating, "score": total_score}, 200
+
+    except requests.RequestException as e:
+        logger.error(f"请求 GitHub API 失败: {e}")
+        return {'error': '请求 GitHub API 失败'}, 500
+    except Exception as e:
+        logger.error(f"获取用户评价信息失败，用户ID: {username}, 错误: {e}")
+        return {'error': '获取用户评价信息失败'}, 500

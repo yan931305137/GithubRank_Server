@@ -1,9 +1,8 @@
 from flask import Blueprint, request, jsonify
 
-from info_service.controllers.info_controller import get_github_rank, get_user_info, get_user_repos_info, get_user_total_info, get_user_tech_info, get_user_guess_nation_info, get_user_summary_info
+from info_service.controllers.info_controller import get_github_rank, get_user_info, get_user_repos_info, \
+    get_user_total_info, get_user_tech_info, get_user_guess_nation_info, get_user_summary_info, get_evaluate_info
 from info_service.utils.logger_utils import logger
-
-from info_service.utils.jwt_utils import token_required
 
 info_bp = Blueprint('info_bp', __name__)
 
@@ -118,3 +117,23 @@ def summary():
     logger.info(f"获取用户评价信息请求处理完毕，github_id: {github_id}")
     return jsonify(response[0]), response[1]
 
+
+@info_bp.route('/evaluate', methods=['GET'])
+def get_evaluate():
+    """
+     获取用户评分
+     :return: JSON响应数据
+     """
+    github_id = request.args.get('github_id')
+    if not github_id:
+        logger.error(f"请求路径: {request.path} - 缺少github_id参数")
+        return jsonify({"error": "缺少github_id参数"}), 400
+
+    try:
+        # 获取用户评分
+        response_data = get_evaluate_info(github_id)
+        logger.info(f"获取用户评分请求处理完毕，user: {github_id}")
+        return response_data
+    except Exception as e:
+        logger.error(f"获取用户评分时发生错误，user: {github_id}，错误信息: {str(e)}")
+        return jsonify({"error": "服务器内部错误"}), 500

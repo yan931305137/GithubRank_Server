@@ -147,6 +147,24 @@ def save_user_guess_nation_info_data(info_id, most_common_language):
         return False
 
 
+def save_evaluate_info(info_id, evaluate):
+    try:
+        with get_cursor(dictionary=True) as cursor:
+            cursor.execute(
+                """
+                INSERT INTO github (github_id, evaluate)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE evaluate = VALUES(evaluate)
+                """,
+                (info_id, json.dumps(evaluate))
+            )
+            connection.commit()
+        return True
+    except Exception as e:
+        logger.error(f"保存用户评价数据失败: {e}")
+        return False
+
+
 def save_user_summary_info_data(info_id, summa):
     try:
         with get_cursor(dictionary=True) as cursor:
@@ -163,4 +181,3 @@ def save_user_summary_info_data(info_id, summa):
     except Exception as e:
         logger.error(f"保存用户数据失败: {e}")
         return False
-

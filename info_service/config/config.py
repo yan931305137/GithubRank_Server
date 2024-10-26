@@ -1,13 +1,19 @@
-import os
+from info_service.utils.nacos_utils import get_config_from_nacos
+
 
 class Config:
     """
     配置类，用于从环境变量中读取配置项
     """
-    DEBUG = os.getenv('FLASK_DEBUG', 'False').lower() in ['true', '1', 't']
-    DB_HOST = os.getenv('DB_HOST', 'localhost')
-    DB_USER = os.getenv('DB_USER', 'root')
-    DB_PASSWORD = os.getenv('DB_PASSWORD', '123456')
-    DB_NAME = os.getenv('DB_NAME', 'github_rank')
-    DB_PORT = int(os.getenv('DB_PORT', 3306))
-    DB_CHARSET = os.getenv('DB_CHARSET', 'utf8mb4')
+    config = get_config_from_nacos("dbConfig.json")
+
+    if config:
+        DEBUG = config.get("DEBUG")
+        DB_HOST = config.get("DB_HOST")
+        DB_USER = config.get("DB_USER")
+        DB_PASSWORD = config.get("DB_PASSWORD")
+        DB_NAME = config.get("DB_NAME")
+        DB_PORT = config.get("DB_PORT")
+        DB_CHARSET = config.get("DB_CHARSET")
+
+        print("配置内容:", config)

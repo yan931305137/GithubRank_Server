@@ -3,4 +3,7 @@
 .test/
 __pycache__/
 .idea/
-./github.py
+github.py
+docker-compose.yml
+result.json
+data/
