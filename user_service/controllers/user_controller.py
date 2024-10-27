@@ -77,7 +77,7 @@ def delete_user_by_id(user_id):
             return {'message': f'用户删除成功'}, 200
         else:
             logger.warning(f"用户删除失败: 用户ID={user_id}")
-            return {'error':f'用户删除失败'}, 400
+            return {'error': f'用户删除失败'}, 400
     except ValueError as e:
         logger.warning(f"用户删除失败: 用户ID={user_id}, 错误信息: {str(e)}")
         return {'error': str(e)}, 404
@@ -163,13 +163,12 @@ def get_appraisals(github_id):
     """
     获取用户的所有评估。
     :param github_id:
-    :param info_id: 用户ID
     """
     try:
         logger.info(f"开始获取用户评估，用户ID: {github_id}")
         appraisals = get_user_appraisals(github_id)
         logger.info(f"成功获取用户评估: {appraisals}")
-        return appraisals,200
+        return appraisals, 200
     except Exception as e:
         logger.error(f"获取用户评估失败，用户ID: {github_id}, 错误: {e}")
         return {'error': '获取用户评估失败'}, 500

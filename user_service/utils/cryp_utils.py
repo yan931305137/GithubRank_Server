@@ -3,6 +3,7 @@ from cryptography.fernet import Fernet
 # 固定密钥
 key = b'jdduZWwbXIgno2-VDdm1-ZjIZd1IpfwTELmrBI29rgk='  # 请将此处替换为您的固定密钥
 
+
 def encrypt_password(password):
     """
     加密密码
@@ -12,6 +13,7 @@ def encrypt_password(password):
     fernet = Fernet(key)
     encrypted_password = fernet.encrypt(password.encode())
     return encrypted_password
+
 
 def decrypt_password(encrypted_password):
     """

@@ -6,9 +6,8 @@ import requests
 import json
 from concurrent.futures import ThreadPoolExecutor
 import urllib3
-from fastapi import HTTPException
 
-from info_service.config.cohereConfig import Config
+from info_service.config.cohereConfig import CohereConfig
 from info_service.config.githubToken import Config
 from info_service.utils.logger_utils import logger
 from info_service.services.info_service import get_rank_data, save_user_data, \
@@ -367,7 +366,7 @@ def get_user_summary_info(username):
         )
 
         # 初始化 Cohere 客户端并生成摘要
-        co = cohere.Client(Config.COHEREKEY)
+        co = cohere.Client(CohereConfig.COHEREKEY)
         response = co.generate(
             model='command',
             prompt=prompt,
@@ -381,9 +380,6 @@ def get_user_summary_info(username):
         logger.info(f"成功获取用户总结信息: {summary_text}")
         return {"summary": summary_text}, 200
 
-    except cohere.CohereError as e:
-        logger.error(f"Cohere API 调用失败: {e}")
-        return {'error': '调用 Cohere API 生成摘要失败'}, 500
     except Exception as e:
         logger.error(f"获取用户总结信息失败，用户ID: {username}, 错误: {e}")
         return {'error': '获取用户总结信息失败'}, 500

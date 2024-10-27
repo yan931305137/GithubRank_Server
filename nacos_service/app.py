@@ -1,35 +1,27 @@
-from fastapi import FastAPI
-from starlette.middleware.cors import CORSMiddleware
-
-from routes.nacos_routes import nacos_bp, client
+from flask import Flask
+from routes.nacos_routes import register_nacos_blueprint, client
 from nacos_service.utils.logger_utils import logger
-import uvicorn
+
+app = Flask(__name__)
+
+# 注册 Nacos 蓝图
+register_nacos_blueprint(app)
 
 
-# 创建并配置FastAPI应用的函数 http://127.0.0.1:8889/docs#/
-def create_app():
-    app = FastAPI()
-    app.include_router(nacos_bp, prefix='/nacos')
+def register_service():
+    """尝试注册服务到 Nacos"""
+    service_name = "nacos_server"
+    ip = "127.0.0.1"
+    port = 8889
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://127.0.0.1:8888"],  # 只允许来自主应用的请求
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    logger.info("FastAPI 应用已创建并配置完成")
-
-    return app
+    try:
+        client.add_naming_instance(service_name, ip, port)
+        logger.info("服务注册成功")
+    except Exception as e:
+        logger.error(f"服务注册失败: {str(e)}")
 
 
 if __name__ == '__main__':
-    app = create_app()
-    try:
-        client.add_naming_instance("nacos_server", "127.0.0.1", 8889)
-        logger.info("服务注册成功")
-    except Exception as e:
-        logger.info("服务注册失败")
+    register_service()  # 在应用启动时注册服务
     # 使用配置文件中的调试模式
-    uvicorn.run(app, host="127.0.0.1", port=8889)
+    app.run(host="127.0.0.1", port=8889, debug=True)

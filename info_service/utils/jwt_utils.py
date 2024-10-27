@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 import jwt
-from flask import jsonify, request
 from functools import wraps
 
 
@@ -40,10 +39,10 @@ class JWTManager:
             return decoded_payload, None
         except jwt.ExpiredSignatureError:
             # 处理过期的签名
-            return None, jsonify({'message': '令牌已过期!'}), 403  # 修改此行
+            return None, {'message': '令牌已过期!'}, 403  # 修改此行
         except jwt.InvalidTokenError:
             # 处理无效的令牌
-            return None, jsonify({'message': '无效的令牌!'}), 403  # 修改此行
+            return None, {'message': '无效的令牌!'}, 403  # 修改此行
 
 
 # 初始化JWT管理器
@@ -58,12 +57,12 @@ def token_required(f):
     """
 
     @wraps(f)
-    def decorated(*args, **kwargs):
+    def decorated(request, *args, **kwargs):
         # 从请求头中获取令牌
         token = request.headers.get('Authorization')
         if not token:
             # 如果令牌缺失，返回错误信息
-            return jsonify({'message': '令牌缺失!'}), 403
+            return {'message': '令牌缺失!'}, 403
         # 验证令牌
         decoded_payload, error_response = jwt_manager.verify_token(token)
         if error_response:

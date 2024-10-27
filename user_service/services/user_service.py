@@ -117,7 +117,7 @@ def service_update_user_by_id(user_id, data):
     :param data: 更新的数据
     :raises ValueError: 如果用户未找到或更新失败
     """
-    with get_cursor() as cursor:
+    with get_cursor(dictionary=True) as cursor:
         try:
             # 检查用户是否存在
             cursor.execute("SELECT * FROM user WHERE id = %s", (user_id,))

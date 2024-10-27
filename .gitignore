@@ -6,4 +6,4 @@ __pycache__/
 app.py
 docker-compose.yml
 result.json
-data/
+test/

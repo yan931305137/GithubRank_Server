@@ -1,6 +1,7 @@
 import mysql
 from mysql.connector import Error
 
+
 def create_connection(host_name, user_name, user_password, db_name):
     """
     创建数据库连接
@@ -23,6 +24,7 @@ def create_connection(host_name, user_name, user_password, db_name):
         print(f"连接数据库时发生错误: {e}")
     return connect
 
+
 def execute_query(connect, query):
     """
     执行数据库查询
@@ -36,6 +38,7 @@ def execute_query(connect, query):
             print("查询成功执行")
     except Error as e:
         print(f"执行查询时发生错误: {e}")
+
 
 def fetch_query(connect, query):
     """

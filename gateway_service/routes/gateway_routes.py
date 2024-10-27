@@ -1,31 +1,86 @@
-from fastapi import APIRouter, Request, HTTPException
+from flasgger import Swagger, swag_from
+from flask import jsonify, request, Blueprint
+
 from gateway_service.controllers.gateway_controller import forward_request
-from fastapi.responses import JSONResponse
 
-gateway_bp = APIRouter()
+gateway_bp = Blueprint('gateway', __name__)  # 使用 Blueprint 而不是 Flask
 
 
-# 对 /user/{path:path} 的请求转发到用户服务
-@gateway_bp.api_route('/user/{path:path}', methods=['GET', 'POST', 'PUT', 'DELETE'])
-async def route_to_user_service(path: str, request: Request):
-    query_params = dict(request.query_params)
+# 在主应用中注册蓝图
+def register_gateway_blueprint(app):
+    app.register_blueprint(gateway_bp)
+    Swagger(app)
+
+
+# 对 /user/<path:path> 的请求转发到用户服务
+@gateway_bp.route('/user/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@swag_from({
+    'tags': ['网关服务'],
+    'parameters': [
+        {
+            'name': 'path',
+            'in': 'path',
+            'required': True,
+            'type': 'string',
+            'description': '用户服务的路径'
+        },
+        {
+            'name': 'query_params',
+            'in': 'query',
+            'required': False,
+            'type': 'object',
+            'description': '查询参数'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': '请求成功'
+        },
+        500: {
+            'description': '服务器内部错误'
+        }
+    }
+})
+def route_to_user_service(path):
     try:
-        response = await forward_request('user', path, query_params, request)
+        response = forward_request('user', path)
         return response
-    except HTTPException as e:
-        return JSONResponse(content=str(e.detail), status_code=e.status_code)
     except Exception as e:
-        return JSONResponse(content=str(e), status_code=500)
+        return jsonify(str(e)), 500
 
 
-# 对 /info/{path:path} 的请求转发到信息服务
-@gateway_bp.api_route('/info/{path:path}', methods=['GET', 'POST', 'PUT', 'DELETE'])
-async def route_to_info_service(path: str, request: Request):
-    query_params = dict(request.query_params)
+# 对 /info/<path:path> 的请求转发到信息服务
+@gateway_bp.route('/info/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
+@swag_from({
+    'tags': ['网关服务'],
+    'parameters': [
+        {
+            'name': 'path',
+            'in': 'path',
+            'required': True,
+            'type': 'string',
+            'description': '信息服务的路径'
+        },
+        {
+            'name': 'query_params',
+            'in': 'query',
+            'required': False,
+            'type': 'object',
+            'description': '查询参数'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': '请求成功'
+        },
+        500: {
+            'description': '服务器内部错误'
+        }
+    }
+})
+def route_to_info_service(path):
     try:
-        response = await forward_request('info', path, query_params, request)
+        response = forward_request('info', path)  # 修改此行
         return response
-    except HTTPException as e:
-        return JSONResponse(content=str(e.detail), status_code=e.status_code)
     except Exception as e:
-        return JSONResponse(content=str(e), status_code=500)
+        return jsonify(str(e)), 500

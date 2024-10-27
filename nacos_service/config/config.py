@@ -1,4 +1,6 @@
 from nacos_service.utils.config_utils import get_nacos_config
+
+
 class Config:
     """
     配置类，用于从环境变量中读取配置项
