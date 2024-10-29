@@ -6,3 +6,6 @@ USER_SERVICE_URL = 'http://localhost:9001/user/'
 
 # 信息服务的URL
 INFO_SERVICE_URL = 'http://localhost:9002/info/'
+
+# 推荐服务的URL
+RECOMMEND_SERVICE_URL = 'http://localhost:9003/recommend/'

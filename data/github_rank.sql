@@ -42,3 +42,12 @@ CREATE TABLE IF NOT EXISTS appraisal (
     UNIQUE KEY unique_github_user (user_id, github_id), -- 防止相同 user_id 和 github_id 的重复记录
     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE -- 外键约束，引用 user 表的 id 列，且启用级联删除
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户评价表';
+
+--
+CREATE TABLE recommend (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    weekly VARCHAR(20) NOT NULL UNIQUE,
+    recommendations JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);

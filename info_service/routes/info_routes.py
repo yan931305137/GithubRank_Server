@@ -450,3 +450,5 @@ def get_evaluate():
     except Exception as e:
         logger.error(f"获取用户评分时发生错误，user: {github_id}，错误信息: {str(e)}")
         return jsonify({"detail": "服务器内部错误"}), 500
+
+

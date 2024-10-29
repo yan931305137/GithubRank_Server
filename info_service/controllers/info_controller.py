@@ -7,15 +7,15 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 import urllib3
 
-from info_service.config.cohereConfig import CohereConfig
-from info_service.config.githubToken import Config
+from info_service.config.cohere_config import CohereConfig
+from info_service.config.github_token_config import Config
 from info_service.utils.logger_utils import logger
 from info_service.services.info_service import get_rank_data, save_user_data, \
     save_user_reops_data, save_user_total_info_data, save_user_tech_info_data, save_user_guess_nation_info_data, \
     save_user_summary_info_data, get_github_id, save_evaluate_info
 
 from info_service.utils.agent_utils import get_random_user_agent
-from info_service.config.githubConfig import GITHUB_USER_URL, GITHUB_REPOS_URL, GITHUB_EVENTS_URL, \
+from info_service.config.github_config import GITHUB_USER_URL, GITHUB_REPOS_URL, GITHUB_EVENTS_URL, \
     GITHUB_CONTRIBUTORS_URL, GITHUB_COMMITS_URL
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

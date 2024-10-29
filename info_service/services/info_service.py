@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 import json
 
-from info_service.config.config import Config
+from info_service.config.db_config import Config
 from info_service.utils.logger_utils import logger
 from info_service.utils.mysql_utils import create_connection
 

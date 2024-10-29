@@ -1,7 +1,7 @@
 import mysql.connector
 from contextlib import contextmanager
 
-from user_service.config.config import Config
+from user_service.config.db_config import Config
 from user_service.utils.cryp_utils import decrypt_password
 from user_service.utils.logger_utils import logger
 from user_service.utils.mysql_utils import create_connection

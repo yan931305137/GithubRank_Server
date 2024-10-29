@@ -2,7 +2,7 @@ from flasgger import swag_from
 from flask import Blueprint, jsonify
 from flask_swagger_ui import get_swaggerui_blueprint
 
-from swagger_service.config.config import SERVICE_URLS
+from swagger_service.config.url_config import SERVICE_URLS
 from swagger_service.utils.swagger_utils import get_swagger_spec, merge_swagger_specs
 
 # 创建一个蓝图
