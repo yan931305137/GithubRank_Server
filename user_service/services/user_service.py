@@ -15,6 +15,24 @@ connection = MySQLPool(
 ).get_connection()
 
 
+
+def ensure_connection():
+    """
+    确保数据库连接是有效的，如果无效则重新连接。
+    """
+    global connection
+    try:
+        connection.ping(reconnect=True)
+    except Exception as e:
+        logger.error(f"数据库连接失败，尝试重新连接: {e}")
+        connection = MySQLPool(
+            host_name=Config.DB_HOST,
+            user_name=Config.DB_USER,
+            user_password=Config.DB_PASSWORD,
+            db_name=Config.DB_NAME
+        ).get_connection()
+
+
 @contextmanager
 def get_cursor(dictionary=False):
     """
@@ -22,6 +40,7 @@ def get_cursor(dictionary=False):
     :param dictionary: 是否返回字典格式的结果
     :return: 数据库游标
     """
+    ensure_connection()  # 确保连接有效
     cursor = connection.cursor(dictionary=dictionary)
     try:
         yield cursor

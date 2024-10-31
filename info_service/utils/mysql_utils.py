@@ -65,7 +65,11 @@ def fetch_query(pool, query):
         try:
             with connection.cursor() as cursor:
                 cursor.execute(query)
-                result = cursor.fetchall()
+                # 确保读取所有结果集
+                while True:
+                    result.extend(cursor.fetchall())
+                    if not cursor.nextset():
+                        break
         except Error as e:
             print(f"获取数据时发生错误: {e}")
         finally:
