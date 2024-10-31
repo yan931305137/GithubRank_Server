@@ -43,11 +43,29 @@ CREATE TABLE IF NOT EXISTS appraisal (
     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE -- 外键约束，引用 user 表的 id 列，且启用级联删除
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户评价表';
 
---
-CREATE TABLE recommend (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    weekly VARCHAR(20) NOT NULL UNIQUE,
-    recommendations JSON NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+-- 创建 weekly_recommend 表
+CREATE TABLE IF NOT EXISTS weekly_recommend (
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID，作为主键',
+    weekly VARCHAR(20) NOT NULL UNIQUE COMMENT '周标识，唯一且不能为空',
+    recommendations JSON NOT NULL COMMENT '推荐数据，存储为JSON格式',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间，默认为当前时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间，默认为当前时间，并在更新时自动更新'
+) COMMENT='存储每周推荐数据的表';
+
+-- 创建 daily_recommend 表
+CREATE TABLE IF NOT EXISTS daily_recommend (
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID，作为主键',
+    daily VARCHAR(20) NOT NULL UNIQUE COMMENT '日标识，唯一且不能为空',
+    recommendations JSON NOT NULL COMMENT '推荐数据，存储为JSON格式',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间，默认为当前时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间，默认为当前时间，并在更新时自动更新'
+) COMMENT='存储每日推荐数据的表';
+
+-- 创建 monthly_recommend 表
+CREATE TABLE IF NOT EXISTS monthly_recommend (
+    id INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID，作为主键',
+    monthly VARCHAR(20) NOT NULL UNIQUE COMMENT '月标识，唯一且不能为空',
+    recommendations JSON NOT NULL COMMENT '推荐数据，存储为JSON格式',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间，默认为当前时间',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间，默认为当前时间，并在更新时自动更新'
+) COMMENT='存储每月推荐数据的表';

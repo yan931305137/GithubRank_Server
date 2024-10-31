@@ -3,15 +3,15 @@ import json
 
 from info_service.config.db_config import Config
 from info_service.utils.logger_utils import logger
-from info_service.utils.mysql_utils import create_connection
+from info_service.utils.mysql_utils import MySQLPool
 
 # 使用配置文件中的数据库连接信息
-connection = create_connection(
+connection = MySQLPool(
     host_name=Config.DB_HOST,
     user_name=Config.DB_USER,
     user_password=Config.DB_PASSWORD,
     db_name=Config.DB_NAME
-)
+).get_connection()
 
 
 @contextmanager

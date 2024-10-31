@@ -338,10 +338,10 @@ def get_user_summary_info(username):
 
         # 获取用户的 GitHub 数据
         result = get_github_id(username)
-        user_info = json.loads(result.get('user_info', '{}'))
+        user_info = json.loads(result.get('user_info', '{}') or '{}')
         most_common_language = result.get('most_common_language', '未知语言')
-        total = json.loads(result.get('total', '{}'))
-        tech_stack = json.loads(result.get('tech_stack', '[]'))
+        total = json.loads(result.get('total', '{}') or '{}')
+        tech_stack = json.loads(result.get('tech_stack', '[]') or '[]')
 
         # 构建 Cohere API 提示内容
         prompt = (
