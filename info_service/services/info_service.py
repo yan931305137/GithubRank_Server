@@ -6,29 +6,31 @@ from info_service.utils.logger_utils import logger
 from info_service.utils.mysql_utils import MySQLPool
 
 # 使用配置文件中的数据库连接信息
-connection = MySQLPool(
+pool = MySQLPool(
     host_name=Config.DB_HOST,
     user_name=Config.DB_USER,
     user_password=Config.DB_PASSWORD,
     db_name=Config.DB_NAME
-).get_connection()
+)
 
 
 def ensure_connection():
     """
     确保数据库连接是有效的，如果无效则重新连接。
     """
-    global connection
+    global pool
     try:
+        connection = pool.get_connection()
         connection.ping(reconnect=True)
+        pool.release_connection(connection)
     except Exception as e:
         logger.error(f"数据库连接失败，尝试重新连接: {e}")
-        connection = MySQLPool(
+        pool = MySQLPool(
             host_name=Config.DB_HOST,
             user_name=Config.DB_USER,
             user_password=Config.DB_PASSWORD,
             db_name=Config.DB_NAME
-        ).get_connection()
+        )
 
 
 @contextmanager
@@ -39,37 +41,63 @@ def get_cursor(dictionary=False):
     :return: 数据库游标
     """
     ensure_connection()  # 确保连接有效
+    connection = pool.get_connection()
     cursor = connection.cursor(dictionary=dictionary)
     try:
         yield cursor
+        connection.commit()  # 添加提交操作
+    except Exception as e:
+        connection.rollback()  # 添加回滚操作
+        raise e
     finally:
         cursor.close()
+        pool.release_connection(connection)
 
 
 def get_github_id(github_id):
+    """
+    根据github_id查询用户信息
+    :param github_id: GitHub用户ID
+    :return: 查询结果,成功返回用户信息,失败返回False,未找到返回None
+    """
     try:
+        query = "SELECT * FROM github WHERE github_id = %s"
         with get_cursor(dictionary=True) as cursor:
-            cursor.execute(
-                """
-                SELECT * FROM github WHERE github_id = %s
-                """,
-                (github_id,)
-            )
+            cursor.execute(query, (github_id,))
             result = cursor.fetchone()
-            cursor.fetchall()  # 确保读取完结果集
-            if result:
-                return result
-            else:
-                return None
+            return result if result else None
     except Exception as e:
         logger.error(f"查询github_id失败: {e}")
         return False
 
 
 def get_rank_data():
+    """
+    获取GitHub用户排名数据
+    :return: 排名数据字典
+    """
     try:
-        # 这里可以添加获取排名数据的逻辑
-        rank_data = {}  # 示例数据
+        query = """
+            SELECT github_id, user_info, evaluate 
+            FROM github 
+            WHERE evaluate IS NOT NULL
+            ORDER BY CAST(JSON_EXTRACT(evaluate, '$.rank') AS SIGNED) ASC
+            LIMIT 100
+        """
+        with get_cursor(dictionary=True) as cursor:
+            cursor.execute(query)
+            results = cursor.fetchall()
+            
+        rank_data = {
+            'top_users': [
+                {
+                    'github_id': row['github_id'],
+                    'user_info': json.loads(row['user_info']) if row['user_info'] else {},
+                    'evaluate': json.loads(row['evaluate']) if row['evaluate'] else {}
+                }
+                for row in results
+            ]
+        }
         return rank_data
     except Exception as e:
         logger.error(f"获取排名数据失败: {e}")
@@ -77,17 +105,23 @@ def get_rank_data():
 
 
 def save_user_data(info_id, user_data):
+    """
+    保存用户基本信息
+    :param info_id: GitHub用户ID
+    :param user_data: 用户信息数据
+    :return: 保存成功返回True,失败返回False
+    """
     try:
-        with get_cursor(dictionary=True) as cursor:
-            cursor.execute(
-                """
-                INSERT INTO github (github_id, user_info)
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE user_info = VALUES(user_info)
-                """,
-                (info_id, json.dumps(user_data))
-            )
-            connection.commit()
+        query = """
+            INSERT INTO github (github_id, user_info, updated_at)
+            VALUES (%s, %s, NOW())
+            ON DUPLICATE KEY UPDATE 
+                user_info = %s,
+                updated_at = NOW()
+        """
+        user_data_json = json.dumps(user_data)
+        with get_cursor(False) as cursor:
+            cursor.execute(query, (info_id, user_data_json, user_data_json))
         return True
     except Exception as e:
         logger.error(f"保存用户数据失败: {e}")
@@ -95,89 +129,95 @@ def save_user_data(info_id, user_data):
 
 
 def save_user_reops_data(info_id, user_repos_data):
+    """
+    保存用户仓库信息
+    :param info_id: GitHub用户ID
+    :param user_repos_data: 用户仓库数据
+    :return: 保存成功返回True,失败返回False
+    """
     try:
-        with get_cursor(dictionary=True) as cursor:
-            cursor.execute(
-                """
-                INSERT INTO github (github_id, repos_info)
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE repos_info = VALUES(repos_info)
-                """,
-                (info_id, json.dumps(user_repos_data))
-            )
-            connection.commit()
+        query = """
+            INSERT INTO github (github_id, repos_info, updated_at)
+            VALUES (%s, %s, NOW())
+            ON DUPLICATE KEY UPDATE 
+                repos_info = %s,
+                updated_at = NOW()
+        """
+        repos_data_json = json.dumps(user_repos_data)
+        with get_cursor() as cursor:
+            cursor.execute(query, (info_id, repos_data_json, repos_data_json))
         return True
     except Exception as e:
-        logger.error(f"保存用户数据失败: {e}")
-        return False
-
-
-def save_user_total_info_data(info_id, data):
-    try:
-        with get_cursor(dictionary=True) as cursor:
-            cursor.execute(
-                """
-                INSERT INTO github (github_id, total)
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE total = VALUES(total)
-                """,
-                (info_id, json.dumps(data))
-            )
-            connection.commit()
-        return True
-    except Exception as e:
-        logger.error(f"保存用户数据失败: {e}")
+        logger.error(f"保存用户仓库数据失败: {e}")
         return False
 
 
 def save_user_tech_info_data(info_id, tech_stack):
+    """
+    保存用户技术栈信息
+    :param info_id: GitHub用户ID
+    :param tech_stack: 技术栈数据
+    :return: 保存成功返回True,失败返回False
+    """
     try:
-        with get_cursor(dictionary=True) as cursor:
-            cursor.execute(
-                """
-                INSERT INTO github (github_id, tech_stack)
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE tech_stack = VALUES(tech_stack)
-                """,
-                (info_id, json.dumps(tech_stack))
-            )
-            connection.commit()
+        query = """
+            INSERT INTO github (github_id, tech_stack, updated_at)
+            VALUES (%s, %s, NOW())
+            ON DUPLICATE KEY UPDATE 
+                tech_stack = %s,
+                updated_at = NOW()
+        """
+        tech_stack_json = json.dumps(tech_stack)
+        with get_cursor() as cursor:
+            cursor.execute(query, (info_id, tech_stack_json, tech_stack_json))
         return True
     except Exception as e:
-        logger.error(f"保存用户数据失败: {e}")
+        logger.error(f"保存用户技术栈数据失败: {e}")
         return False
 
 
 def save_user_guess_nation_info_data(info_id, most_common_language):
+    """
+    保存用户语言使用信息
+    :param info_id: GitHub用户ID
+    :param most_common_language: 最常用语言数据
+    :return: 保存成功返回True,失败返回False
+    """
     try:
-        with get_cursor(dictionary=True) as cursor:
-            cursor.execute(
-                """
-                INSERT INTO github (github_id, most_common_language)
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE most_common_language = VALUES(most_common_language)
-                """,
-                (info_id, json.dumps(most_common_language))
-            )
-            connection.commit()
+        query = """
+            INSERT INTO github (github_id, most_common_language, updated_at)
+            VALUES (%s, %s, NOW())
+            ON DUPLICATE KEY UPDATE 
+                most_common_language = %s,
+                updated_at = NOW()
+        """
+        language_json = json.dumps(most_common_language)
+        with get_cursor() as cursor:
+            cursor.execute(query, (info_id, language_json, language_json))
         return True
     except Exception as e:
-        logger.error(f"保存用户数据失败: {e}")
+        logger.error(f"保存用户语言数据失败: {e}")
         return False
 
 
 def save_evaluate_info(info_id, evaluate):
+    """
+    保存用户评估信息
+    :param info_id: GitHub用户ID
+    :param evaluate: 评估数据
+    :return: 保存成功返回True,失败返回False
+    """
     try:
-        with get_cursor(dictionary=True) as cursor:
-            cursor.execute(
-                """
-                INSERT INTO github (github_id, evaluate)
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE evaluate = VALUES(evaluate)
-                """,
-                (info_id, json.dumps(evaluate))
-            )
-            connection.commit()
+        query = """
+            INSERT INTO github (github_id, evaluate, updated_at)
+            VALUES (%s, %s, NOW())
+            ON DUPLICATE KEY UPDATE 
+                evaluate = %s,
+                updated_at = NOW()
+        """
+        evaluate_json = json.dumps(evaluate)
+        with get_cursor() as cursor:
+            cursor.execute(query, (info_id, evaluate_json, evaluate_json))
         return True
     except Exception as e:
         logger.error(f"保存用户评价数据失败: {e}")
@@ -185,18 +225,24 @@ def save_evaluate_info(info_id, evaluate):
 
 
 def save_user_summary_info_data(info_id, summa):
+    """
+    保存用户总结信息
+    :param info_id: GitHub用户ID
+    :param summa: 总结数据
+    :return: 保存成功返回True,失败返回False
+    """
     try:
-        with get_cursor(dictionary=True) as cursor:
-            cursor.execute(
-                """
-                INSERT INTO github (github_id, summa)
-                VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE summa = VALUES(summa)
-                """,
-                (info_id, json.dumps(summa))
-            )
-            connection.commit()
+        query = """
+            INSERT INTO github (github_id, summa, updated_at)
+            VALUES (%s, %s, NOW())
+            ON DUPLICATE KEY UPDATE 
+                summa = %s,
+                updated_at = NOW()
+        """
+        summa_json = json.dumps(summa)
+        with get_cursor() as cursor:
+            cursor.execute(query, (info_id, summa_json, summa_json))
         return True
     except Exception as e:
-        logger.error(f"保存用户数据失败: {e}")
+        logger.error(f"保存用户总结数据失败: {e}")
         return False

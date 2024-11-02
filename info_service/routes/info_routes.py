@@ -4,8 +4,7 @@ from flask import jsonify, request, Blueprint
 
 from info_service.utils.logger_utils import logger
 
-from info_service.controllers.info_controller import get_github_rank, get_user_info, get_user_repos_info, \
-    get_user_total_info, get_user_tech_info, get_user_guess_nation_info, get_user_summary_info, get_evaluate_info
+from info_service.controllers.info_controller import InfoController
 
 # 定义蓝图
 info_bp = Blueprint('info', __name__)
@@ -41,7 +40,7 @@ def rank():
     :return: 响应数据
     """
     logger.info("获取githubRank请求已收到")
-    response = get_github_rank()
+    response = InfoController.get_github_rank()
     logger.info("获取githubRank请求处理完毕")
     return jsonify(response[0]), response[1]
 
@@ -100,7 +99,7 @@ def user_info():
         return jsonify({"detail": "缺少github_id参数"}), 400
 
     logger.info(f"获取用户信息请求已收到，github_id: {github_id}")
-    response = get_user_info(github_id)
+    response = InfoController.get_user_info(github_id)
     logger.info(f"获取用户信息请求处理完毕，github_id: {github_id}")
     return jsonify(response[0]), response[1]
 
@@ -159,65 +158,9 @@ def repos_info():
         return jsonify({"detail": "缺少github_id参数"}), 400
 
     logger.info(f"获取用户项目信息请求已收到，github_id: {github_id}")
-    response = get_user_repos_info(github_id)
+    response = InfoController.get_user_repos_info(github_id)
     logger.info(f"获取用户项目信息请求处理完毕，github_id: {github_id}")
     return jsonify(response[0]), response[1]
-
-
-@info_bp.route('/total', methods=['GET'])
-@swag_from({
-    'tags': ['信息服务'],
-    'parameters': [
-        {
-            'name': 'github_id',
-            'in': 'query',
-            'required': True,
-            'type': 'string',
-            'description': 'GitHub 用户ID'
-        }
-    ],
-    'responses': {
-        200: {
-            'description': '获取用户项目总数信息成功',
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'total_stars': {
-                        'type': 'integer',
-                        'example': 500
-                    }
-                }
-            }
-        },
-        400: {
-            'description': '缺少github_id参数',
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'detail': {
-                        'type': 'string',
-                        'example': '缺少github_id参数'
-                    }
-                }
-            }
-        }
-    }
-})
-def total_info():
-    """
-    获取单个github用户项目stars等总数信息
-    :return: 响应数据
-    """
-    github_id = request.args.get('github_id')
-    if not github_id:
-        logger.error(request.path)
-        return jsonify({"detail": "缺少github_id参数"}), 400
-    user_id = request.args.get('github_id')
-    logger.info(f"获取用户项目总数信息请求已收到，github_id: {user_id}")
-    response = get_user_total_info(user_id)
-    logger.info(f"获取用户项目总数信息请求处理完毕，github_id: {user_id}")
-    return jsonify(response[0]), response[1]
-
 
 @info_bp.route('/techInfo', methods=['GET'])
 @swag_from({
@@ -268,7 +211,7 @@ def tech_info():
         logger.error(request.path)
         return jsonify({"detail": "缺少github_id参数"}), 400
     logger.info(f"获取用户技术栈信息请求已收到，github_id: {github_id}")
-    response = get_user_tech_info(github_id)
+    response = InfoController.get_user_tech_info(github_id)
     logger.info(f"获取用户技术栈信息请求处理完毕，github_id: {github_id}")
     return jsonify(response[0]), response[1]
 
@@ -322,7 +265,7 @@ def guess_nation():
         logger.error(request.path)
         return jsonify({"detail": "缺少github_id参数"}), 400
     logger.info(f"获取用户国家信息猜测请求已收到，github_id: {github_id}")
-    response = get_user_guess_nation_info(github_id)
+    response = InfoController.get_user_guess_nation_info(github_id)
     logger.info(f"获取用户国家信息猜测请求处理完毕，github_id: {github_id}")
     return jsonify(response[0]), response[1]
 
@@ -376,7 +319,7 @@ def summary():
         logger.error(request.path)
         return jsonify({"detail": "缺少github_id参数"}), 400
     logger.info(f"获取用户评价信息请求已收到，github_id: {github_id}")
-    response = get_user_summary_info(github_id)
+    response = InfoController.get_user_summary_info(github_id)
     logger.info(f"获取用户评价信息请求处理完毕，github_id: {github_id}")
     return jsonify(response[0]), response[1]
 
@@ -444,7 +387,7 @@ def get_evaluate():
 
     try:
         # 获取用户评分
-        response_data = get_evaluate_info(github_id)
+        response_data = InfoController.get_evaluate_info(github_id)
         logger.info(f"获取用户评分请求处理完毕，user: {github_id}")
         return jsonify(response_data[0]), response_data[1]
     except Exception as e:

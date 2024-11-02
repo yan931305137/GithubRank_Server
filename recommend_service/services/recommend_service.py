@@ -14,7 +14,6 @@ connection = MySQLPool(
 ).get_connection()
 
 
-
 def ensure_connection():
     """
     确保数据库连接是有效的，如果无效则重新连接。

@@ -1,350 +1,322 @@
 import re
-
-import cohere
 import langid
 import requests
 import json
-from concurrent.futures import ThreadPoolExecutor
 import urllib3
+from bs4 import BeautifulSoup
 
 from info_service.config.cohere_config import CohereConfig
 from info_service.config.github_token_config import Config
 from info_service.utils.logger_utils import logger
-from info_service.services.info_service import get_rank_data, save_user_data, \
-    save_user_reops_data, save_user_total_info_data, save_user_tech_info_data, save_user_guess_nation_info_data, \
-    save_user_summary_info_data, get_github_id, save_evaluate_info
-
+from info_service.services.info_service import (
+    get_rank_data, save_user_data, save_user_reops_data,
+    save_user_tech_info_data, save_user_guess_nation_info_data, save_user_summary_info_data,
+    get_github_id, save_evaluate_info
+)
 from info_service.utils.agent_utils import get_random_user_agent
-from info_service.config.github_config import GITHUB_USER_URL, GITHUB_REPOS_URL, GITHUB_EVENTS_URL, \
-    GITHUB_CONTRIBUTORS_URL, GITHUB_COMMITS_URL
+from info_service.config.github_config import (
+    GITHUB_USER_URL, GITHUB_REPOS_URL, GITHUB_EVENTS_URL,
+)
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-def get_paginated_data(url, headers, session):
-    """通过分页获取 GitHub API 数据。"""
-    page = 1
-    data = []
-    while True:
-        response = session.get(url, params={'per_page': 100, 'page': page}, headers=headers)
-        if response.status_code != 200:
-            logger.warning(f"获取分页数据失败, URL: {url}, 状态码: {response.status_code}")
-            break
-        page_data = response.json()
-        if not page_data:
-            break
-        data.extend(page_data)
-        page += 1
-    return data
+class InfoController:
+    """info 控制器类,处理所有 info 相关的请求"""
 
+    @staticmethod
+    def get_paginated_data(url, headers, session):
+        """通过分页获取 GitHub API 数据"""
+        page = 1
+        data = []
+        logger.info(f"开始获取分页数据,URL: {url}")
+        while True:
+            response = session.get(url, params={'per_page': 100, 'page': page}, headers=headers)
+            if response.status_code != 200:
+                logger.warning(f"获取分页数据失败, URL: {url}, 状态码: {response.status_code}, 页码: {page}")
+                break
+            page_data = response.json()
+            if not page_data:
+                logger.info(f"已获取所有分页数据,共{page-1}页")
+                break
+            data.extend(page_data)
+            logger.debug(f"成功获取第{page}页数据,数据条数:{len(page_data)}")
+            page += 1
+        return data
 
-def get_github_rank():
-    """
-    获取GitHub排名信息。
-    """
-    try:
-        logger.info("开始获取GitHub排名信息")
-        rank_data = get_rank_data()
-        logger.info(f"成功获取GitHub排名信息: {rank_data}")
-        return rank_data, 200
-    except Exception as e:
-        logger.error(f"获取GitHub排名信息失败: {e}")
-        return {'error': '获取GitHub排名信息失败'}, 500
+    @staticmethod
+    def get_github_rank():
+        """获取GitHub排名信息"""
+        try:
+            logger.info("开始获取GitHub排名信息")
+            rank_data = get_rank_data()
+            logger.info(f"成功获取GitHub排名信息,共{len(rank_data.get('top_users', []))}条记录")
+            return rank_data, 200
+        except Exception as e:
+            logger.error(f"获取GitHub排名信息失败: {e}", exc_info=True)
+            return {'error': '获取GitHub排名信息失败'}, 500
 
+    @staticmethod
+    def get_user_info(info_id):
+        """获取用户基本信息"""
+        try:
+            logger.info(f"开始获取用户{info_id}的基本信息")
+            user_url = GITHUB_USER_URL.format(username=info_id)
+            session = requests.Session()
+            headers = {
+                'User-Agent': get_random_user_agent(),
+                'Authorization': f'token {Config.token}'
+            } if Config.token else {}
 
-def get_user_info(info_id):
-    """
-    根据用户ID获取用户信息。
-    :param info_id: 用户ID
-    """
-    try:
-        user_url = GITHUB_USER_URL.format(username=info_id)
-        session = requests.Session()
-        headers = {'User-Agent': get_random_user_agent(),
-                   'Authorization': f'token {Config.token}'
-                   } if Config.token else {}
-
-        user_response = session.get(user_url, headers=headers, verify=False)
-        if user_response.status_code == 200:
-            user_data = user_response.json()
-            logger.info(f"成功获取用户信息: {user_data}")
-            save_response = save_user_data(info_id, user_data)
-            if save_response:
-                return user_data, 200
-            else:
+            user_response = session.get(user_url, headers=headers, verify=False)
+            if user_response.status_code == 200:
+                user_data = user_response.json()
+                logger.info(f"成功获取用户{info_id}的基本信息")
+                logger.debug(f"用户{info_id}的详细信息: {user_data}")
+                if save_user_data(info_id, user_data):
+                    return user_data, 200
+                logger.error(f"保存用户{info_id}的基本信息失败")
                 return {'error': '保存用户信息失败'}, 500
-        else:
-            logger.error(f"获取用户信息失败: 用户信息状态码 {user_response.status_code}")
+            logger.error(f"获取用户{info_id}信息失败: 状态码 {user_response.status_code}")
             return {'error': '获取用户信息失败'}, user_response.status_code
-    except Exception as e:
-        logger.error(f"获取用户信息失败，用户ID: {info_id}, 错误: {e}")
-        return {'error': '获取用户信息失败'}, 500
+        except Exception as e:
+            logger.error(f"获取用户{info_id}信息失败: {e}", exc_info=True)
+            return {'error': '获取用户信息失败'}, 500
 
-
-def get_user_repos_info(info_id):
-    """
-    获取用户的仓库信息。
-    :param info_id: 用户ID
-    """
-    try:
-        user_url = GITHUB_REPOS_URL.format(username=info_id)
-        session = requests.Session()
-        headers = {'User-Agent': get_random_user_agent(),
-                   'Authorization': f'token {Config.token}'
-                   } if Config.token else {}
-        user_response = session.get(user_url, headers=headers, verify=False)
-        if user_response.status_code == 200:
-            user_data = user_response.json()
-            logger.info(f"成功获取用户项目信息")
-            save_response = save_user_reops_data(info_id, user_data)
-            if save_response:
-                return user_data, 200
-            else:
+    @staticmethod
+    def get_user_repos_info(info_id):
+        """获取用户仓库信息"""
+        try:
+            logger.info(f"开始获取用户{info_id}的仓库信息")
+            user_url = GITHUB_REPOS_URL.format(username=info_id)
+            session = requests.Session()
+            headers = {
+                'User-Agent': get_random_user_agent(),
+                'Authorization': f'token {Config.token}'
+            } if Config.token else {}
+            user_response = session.get(user_url, headers=headers, verify=False)
+            if user_response.status_code == 200:
+                user_data = user_response.json()
+                logger.info(f"成功获取用户{info_id}的仓库信息,共{len(user_data)}个仓库")
+                if save_user_reops_data(info_id, user_data):
+                    return user_data, 200
+                logger.error(f"保存用户{info_id}的仓库信息失败")
                 return {'error': '保存用户项目信息失败'}, 500
-        else:
-            logger.error(f"获取用户项目信息失败: 用户项目信息状态码 {user_response.status_code}")
+            logger.error(f"获取用户{info_id}仓库信息失败: 状态码 {user_response.status_code}")
             return {'error': '获取用户项目信息失败'}, user_response.status_code
-    except Exception as e:
-        logger.error(f"获取用户项目信息失败，用户ID: {info_id}, 错误: {e}")
-        return {'error': '获取用户项目信息失败'}, 500
+        except Exception as e:
+            logger.error(f"获取用户{info_id}仓库信息失败: {e}", exc_info=True)
+            return {'error': '获取用户项目信息失败'}, 500
 
+    @staticmethod
+    def get_user_tech_info(info_id):
+        """获取用户技术栈信息"""
+        try:
+            logger.info(f"开始获取用户{info_id}的技术栈信息")
+            result = get_github_id(info_id)
+            repos = json.loads(result.get('repos_info', '[]'))
+            language_stats = {}
 
-def get_user_total_info(info_id):
-    """
-    获取用户的总信息。
-    :param info_id: 用户ID
-    """
-    try:
-        logger.info(f"开始获取用户总信息，用户ID: {info_id}")
-        session = requests.Session()
-        headers = {'User-Agent': get_random_user_agent(),
-                   'Authorization': f'token {Config.token}'
-                   } if Config.token else {}
+            headers = {
+                'User-Agent': get_random_user_agent(),
+                'Authorization': f'token {Config.token}'
+            } if Config.token else {}
 
-        total_commits, total_prs, total_issues, total_stars = 0, 0, 0, 0
+            for repo in repos:
+                languages_url = repo.get("languages_url")
+                logger.debug(f"正在获取仓库{repo.get('name')}的语言信息")
+                response = requests.get(languages_url, headers=headers)
 
-        # 将 JSON 字符串解析为字典
-        result = get_github_id(info_id)
-        repos_data = json.loads(result['repos_info'])
+                if response.status_code == 200:
+                    languages = response.json()
+                    for lang, bytes_count in languages.items():
+                        if lang not in language_stats:
+                            language_stats[lang] = {"bytes": 0, "count": 0}
+                        language_stats[lang]["bytes"] += bytes_count
+                        language_stats[lang]["count"] += 1
+                else:
+                    logger.error(f"获取仓库{repo.get('name')}的语言信息失败: 状态码 {response.status_code}")
 
-        with ThreadPoolExecutor() as executor:
-            futures = []
-            for repo in repos_data:
-                repo_name = repo['name']
-                total_stars += repo.get('stargazers_count', 0)
+            total_bytes = sum(stats["bytes"] for stats in language_stats.values())
+            language_details = []
+            for lang, stats in language_stats.items():
+                percentage = (stats["bytes"] / total_bytes) * 100 if total_bytes > 0 else 0
+                language_details.append({
+                    "language": lang,
+                    "weight": percentage,
+                    "language_percentages": f"{percentage:.2f}%",
+                    "count": stats["count"]
+                })
 
-                # 提交任务时指定类型，减少 future.result() 时的判断
-                futures.append((executor.submit(get_paginated_data,
-                                                f"https://api.github.com/repos/{info_id}/{repo_name}/commits",
-                                                headers, session), 'commits'))
-                futures.append((executor.submit(get_paginated_data,
-                                                f"https://api.github.com/repos/{info_id}/{repo_name}/pulls",
-                                                headers, session), 'pulls'))
-                futures.append((executor.submit(get_paginated_data,
-                                                f"https://api.github.com/repos/{info_id}/{repo_name}/issues",
-                                                headers, session), 'issues'))
+            language_details.sort(key=lambda x: x['weight'], reverse=True)
+            logger.info(f"成功分析用户{info_id}的技术栈信息,共使用{len(language_details)}种编程语言")
 
-            # 统计请求结果
-            for future, request_type in futures:
-                result = future.result()
-                if request_type == 'commits':
-                    total_commits += len(result)
-                elif request_type == 'pulls':
-                    total_prs += len(result)
-                elif request_type == 'issues':
-                    total_issues += len(result)
-
-        total_info = {
-            'total_commits': total_commits,
-            'total_prs': total_prs,
-            'total_issues': total_issues,
-            'total_stars': total_stars
-        }
-        logger.info(f"成功获取用户总信息: {total_info}")
-
-        save_response = save_user_total_info_data(info_id, total_info)
-        if save_response:
-            return total_info, 200
-        else:
-            return {'error': '保存用户项目信息失败'}, 500
-    except Exception as e:
-        logger.error(f"获取用户总信息失败，用户ID: {info_id}, 错误: {e}")
-        return {'error': '获取用户总信息失败'}, 500
-
-
-def get_user_tech_info(info_id):
-    """
-    获取用户的技术信息。
-    :param info_id: 用户ID
-    :return: 用户的语言使用详情和HTTP状态码
-    """
-    try:
-        # 获取 GitHub 用户的仓库信息
-        result = get_github_id(info_id)
-        repos = json.loads(result.get('repos_info', '[]'))
-
-        # 初始化 language_stats，用于存储每种语言的字节数和项目计数
-        language_stats = {}
-
-        # 遍历用户所有仓库，获取每个仓库的语言统计信息
-        for repo in repos:
-            languages_url = repo.get("languages_url")
-            headers = {'User-Agent': get_random_user_agent(),
-                       'Authorization': f'token {Config.token}'
-                       } if Config.token else {}
-
-            response = requests.get(languages_url, headers=headers)
-
-            if response.status_code == 200:
-                languages = response.json()
-                for lang, bytes_count in languages.items():
-                    # 累加每种语言的字节数和项目个数
-                    if lang not in language_stats:
-                        language_stats[lang] = {"bytes": 0, "count": 0}
-                    language_stats[lang]["bytes"] += bytes_count
-                    language_stats[lang]["count"] += 1
-            else:
-                logger.error(f"获取仓库 {repo.get('name')} 的语言信息失败: {response.status_code}")
-
-        # 计算各语言的使用比例
-        total_bytes = sum(stats["bytes"] for stats in language_stats.values())
-        language_details = []
-        for lang, stats in language_stats.items():
-            percentage = (stats["bytes"] / total_bytes) * 100 if total_bytes > 0 else 0
-            language_details.append({
-                "language": lang,
-                "weight": percentage,
-                "language_percentages": f"{percentage:.2f}%",
-                "count": stats["count"]  # 项目个数
-            })
-
-        # 按照权重对 language_details 进行排序
-        language_details.sort(key=lambda x: x['weight'], reverse=True)
-
-        # 保存用户的技术信息数据
-        save_response = save_user_tech_info_data(info_id, language_details)
-        if save_response:
-            return language_details, 200
-        else:
+            if save_user_tech_info_data(info_id, language_details):
+                return language_details, 200
+            logger.error(f"保存用户{info_id}的技术栈信息失败")
             return {'error': '保存用户技术信息失败'}, 500
 
-    except Exception as e:
-        logger.error(f"获取用户技术信息失败，用户ID: {info_id}, 错误: {e}")
-        return {'error': '获取用户技术信息失败'}, 500
+        except Exception as e:
+            logger.error(f"获取用户{info_id}技术栈信息失败: {e}", exc_info=True)
+            return {'error': '获取用户技术信息失败'}, 500
 
+    @staticmethod
+    def get_user_guess_nation_info(username):
+        """猜测用户国家信息"""
+        try:
+            logger.info(f"开始猜测用户{username}的国家信息")
+            result = get_github_id(username)
+            user_data = json.loads(result.get('user_info', '{}'))
 
-def get_user_guess_nation_info(username):
-    """
-    猜测用户的国家信息。
-    :param username: 用户名
-    """
-    try:
+            # 检查用户位置信息
+            location = user_data.get("location")
+            if location:
+                logger.info(f"从用户资料中获取到位置信息: {location}")
+                if save_user_guess_nation_info_data(username, {"guess_nation": location}):
+                    return {"guess_nation": location}, 200
 
-        logger.info(f"开始猜测用户国家信息，用户名: {username}")
+            # 从活动记录中获取位置信息
+            logger.info(f"开始从用户{username}的活动记录中获取位置信息")
+            events_response = requests.get(GITHUB_EVENTS_URL.format(username=username))
+            events_response.raise_for_status()
+            events_data = events_response.json()
 
-        result = get_github_id(username)
-        user_data = json.loads(result.get('user_info', '{}'))
+            for event in events_data:
+                if event["type"] == "PushEvent":
+                    location = InfoController._check_commit_location(event, username)
+                    if location:
+                        return location
 
-        # 获取位置信息
-        location = user_data.get("location")
-        if location:
-            logger.info(f"GitHub 用户 {username} 的位置信息为: {location}")
-            save = save_user_guess_nation_info_data(username, {"guess_nation": location})
-            if save:
-                return {"guess_nation": location}, 200
+            # 从README中获取语言信息推测位置
+            logger.info(f"开始从用户{username}的README文件中分析语言")
+            repos_data = json.loads(result.get('repos_info', '[]'))
+            location = InfoController._check_readme_language(username, repos_data)
+            if location:
+                return location
 
-        logger.info(f"GitHub 用户 {username} 未公开位置信息，尝试从活动记录或 README 中获取...")
+            logger.info(f"未能找到用户{username}的位置信息")
+            return {"guess_nation": "None"}, 200
 
-        # 获取用户的最近活动记录
-        events_response = requests.get(GITHUB_EVENTS_URL.format(username=username))
-        events_response.raise_for_status()
-        events_data = events_response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"获取GitHub用户{username}信息失败: {e}", exc_info=True)
+            return {'error': '获取GitHub用户信息失败'}, 500
+        except Exception as e:
+            logger.error(f"猜测用户{username}国家信息失败: {e}", exc_info=True)
+            return {'error': '猜测用户国家信息失败'}, 500
 
-        # 分析活动记录
-        possible_location = None
-        for event in events_data:
-            if event["type"] == "PushEvent":
-                for commit in event["payload"]["commits"]:
-                    commit_url = commit["url"]
-                    commit_response = requests.get(commit_url)
-                    commit_response.raise_for_status()
-                    commit_data = commit_response.json()
+    @staticmethod
+    def get_user_summary_info(username):
+        """获取用户总结信息"""
+        try:
+            logger.info(f"开始获取用户{username}的总结信息")
+            result = get_github_id(username)
+            if not result:
+                logger.error(f"获取用户{username}的GitHub ID失败")
+                return {'error': '获取GitHub ID失败'}, 500
 
-                    commit_message = commit_data.get("commit", {}).get("message", "").lower()
-                    author_name = commit_data.get("commit", {}).get("author", {}).get("name", "").lower()
-                    author_email = commit_data.get("commit", {}).get("author", {}).get("email", "").lower()
+            # 准备用户数据
+            user_info = json.loads(result.get('user_info', '{}') or '{}')
+            most_common_language = result.get('most_common_language', '未知语言')
+            tech_stack = json.loads(result.get('tech_stack', '[]') or '[]')
 
-                    if any(keyword in commit_message for keyword in ["country", "city", "location"]):
-                        possible_location = commit_message
-                        break
-                    elif any(keyword in author_name for keyword in ["country", "city", "location"]):
-                        possible_location = author_name
-                        break
-                    elif any(keyword in author_email for keyword in ["country", "city", "location"]):
-                        possible_location = author_email
-                        break
+            # 生成提示信息
+            logger.info(f"正在为用户{username}生成总结提示信息")
+            prompt_data = InfoController._generate_summary_prompt(user_info, most_common_language, tech_stack)
 
-            if possible_location:
-                logger.info(f"通过提交记录推测 GitHub 用户 {username} 的位置信息为: {possible_location}")
-                save = save_user_guess_nation_info_data(username, {"guess_nation": possible_location})
-                if save:
-                    return {"guess_nation": possible_location}, 200
+            # 调用Cohere API
+            logger.info(f"开始调用Cohere API生成用户{username}的总结")
+            summary_text = InfoController._get_cohere_summary(prompt_data)
+            if not summary_text:
+                logger.error(f"为用户{username}生成总结失败")
+                return {'error': 'Cohere API请求失败'}, 500
 
-        # 如果活动记录没有找到，尝试从 README 中获取语言信息
-        repos_data = json.loads(result.get('repos_info', '[]'))
-        branches = ["main", "master"]  # 支持的分支列表
+            logger.info(f"成功生成用户{username}的总结信息")
+            logger.debug(f"用户{username}的总结内容: {summary_text}")
+            save_user_summary_info_data(username, summary_text)
+            return {"summary": summary_text}, 200
+
+        except Exception as e:
+            logger.error(f"获取用户{username}总结信息失败: {e}", exc_info=True)
+            return {'error': '获取用户总结信息失败'}, 500
+
+    @staticmethod
+    def get_evaluate_info(username):
+        """获取用户GitHub统计评价信息"""
+        try:
+            logger.info(f"开始获取用户{username}的GitHub统计评价信息")
+            url = f'https://github-readme-stats.vercel.app/api?username={username}'
+            response = requests.get(url, verify=False, timeout=10)
+
+            if response.status_code == 200:
+                svg_content = response.text
+                soup = BeautifulSoup(svg_content, 'html.parser')
+
+                stats = InfoController._parse_github_stats(soup, username)
+                logger.info(f"成功解析用户{username}的GitHub统计数据")
+                logger.debug(f"用户{username}的统计数据: {stats}")
+                save_evaluate_info(username, stats)
+                return stats, 200
+
+            logger.error(f"请求用户{username}的GitHub统计数据失败: HTTP {response.status_code}")
+            return {'error': '请求GitHub统计数据失败'}, response.status_code
+
+        except requests.RequestException as e:
+            logger.error(f"请求用户{username}的GitHub统计数据失败: {str(e)}", exc_info=True)
+            return {'error': '请求GitHub统计数据失败'}, 500
+        except Exception as e:
+            logger.error(f"获取用户{username}评价信息失败: {str(e)}", exc_info=True)
+            return {'error': '获取用户评价信息失败'}, 500
+
+    @staticmethod
+    def _check_commit_location(event, username):
+        """检查提交信息中的位置信息"""
+        for commit in event["payload"]["commits"]:
+            commit_url = commit["url"]
+            commit_response = requests.get(commit_url)
+            commit_response.raise_for_status()
+            commit_data = commit_response.json()
+
+            location_keywords = ["country", "city", "location"]
+            commit_message = commit_data.get("commit", {}).get("message", "").lower()
+            author_name = commit_data.get("commit", {}).get("author", {}).get("name", "").lower()
+            author_email = commit_data.get("commit", {}).get("author", {}).get("email", "").lower()
+
+            for text in [commit_message, author_name, author_email]:
+                if any(keyword in text for keyword in location_keywords):
+                    logger.info(f"在用户{username}的提交信息中找到位置信息: {text}")
+                    if save_user_guess_nation_info_data(username, {"guess_nation": text}):
+                        return {"guess_nation": text}, 200
+        return None
+
+    @staticmethod
+    def _check_readme_language(username, repos_data):
+        """检查README文件的语言"""
         for repo in repos_data:
-            for branch in branches:
+            for branch in ["main", "master"]:
                 readme_url = f"https://raw.githubusercontent.com/{username}/{repo['name']}/{branch}/README.md"
                 try:
                     readme_response = requests.get(readme_url)
                     readme_response.raise_for_status()
                     readme_content = readme_response.text
 
-                    # 使用 langid 进行语言检测
                     lang, _ = langid.classify(readme_content)
+                    logger.debug(f"仓库{repo['name']}的README语言为: {lang}")
                     if lang == "zh":
-                        logger.info(f"通过 README 文件推测 GitHub 用户 {username} 可能来自中国")
-                        save = save_user_guess_nation_info_data(username, {"guess_nation": "China"})
-                        if save:
+                        logger.info(f"用户{username}的README使用中文,推测来自中国")
+                        if save_user_guess_nation_info_data(username, {"guess_nation": "China"}):
                             return {"guess_nation": "China"}, 200
                     elif lang == "en":
-                        logger.info(f"通过 README 文件推测 GitHub 用户 {username} 可能来自英语国家")
-                        save = save_user_guess_nation_info_data(username, {"guess_nation": "China"})
-                        if save:
+                        logger.info(f"用户{username}的README使用英文")
+                        if save_user_guess_nation_info_data(username, {"guess_nation": "English-speaking country"}):
                             return {"guess_nation": "English-speaking country"}, 200
                 except requests.exceptions.RequestException:
                     continue
+        return None
 
-        # 无法通过其他途径找到用户位置信息的默认提示
-        logger.info(f"未能通过活动记录或 README 文件找到 GitHub 用户 {username} 的位置信息")
-        return {"guess_nation": "None"}, 200
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"获取 GitHub 用户信息失败: {e}")
-        return {'error': '获取 GitHub 用户信息失败'}, 500
-    except Exception as e:
-        logger.error(f"猜测用户国家信息失败，用户名: {username}, 错误: {e}")
-        return {'error': '猜测用户国家信息失败'}, 500
-
-
-def get_user_summary_info(username):
-    """
-    获取用户的总结信息。
-    :param username: 用户名
-    """
-    try:
-        logger.info(f"开始获取用户总结信息，用户ID: {username}")
-
-        # 获取用户的 GitHub 数据
-        result = get_github_id(username)
-        user_info = json.loads(result.get('user_info', '{}') or '{}')
-        most_common_language = result.get('most_common_language', '未知语言')
-        total = json.loads(result.get('total', '{}') or '{}')
-        tech_stack = json.loads(result.get('tech_stack', '[]') or '[]')
-
-        # 构建 Cohere API 提示内容
-        prompt = (
+    @staticmethod
+    def _generate_summary_prompt(user_info, most_common_language, tech_stack):
+        """生成用户总结提示信息"""
+        return (
             f"用户名: {user_info.get('login', '未知')}\n"
             f"姓名: {user_info.get('name', '未知')}\n"
             f"公司: {user_info.get('company', '未知')}\n"
@@ -359,86 +331,69 @@ def get_user_summary_info(username):
             f"粉丝数: {user_info.get('followers', 0)}\n"
             f"关注数: {user_info.get('following', 0)}\n"
             f"最常用的项目语言: {most_common_language}\n"
-            f"总提交数: {total.get('total_commits', 0)}, 总PR数: {total.get('total_prs', 0)}, "
-            f"总Issue数: {total.get('total_issues', 0)}, 总星标数: {total.get('total_stars', 0)}\n"
             f"主要技术栈: {', '.join([tech['language'] for tech in tech_stack[:3]])}\n"
             "以上信息是有关GitHub用户的个人信息，请以此生成一段用户介绍信息，要求300字英文！"
         )
 
-        # 初始化 Cohere 客户端并生成摘要
-        co = cohere.Client(CohereConfig.COHEREKEY)
-        response = co.generate(
-            model='command',
-            prompt=prompt,
-            max_tokens=300,
-            temperature=0.7
+    @staticmethod
+    def _get_cohere_summary(prompt_data):
+        """调用Cohere API获取总结"""
+        headers = {
+            'Authorization': f'BEARER {CohereConfig.COHEREKEY}',
+            'Content-Type': 'application/json'
+        }
+        
+        data = {
+            'model': 'command',
+            'prompt': prompt_data,
+            'max_tokens': 300,
+            'temperature': 0.7,
+            'k': 0,
+            'stop_sequences': [],
+            'return_likelihoods': 'NONE'
+        }
+
+        logger.info("开始调用Cohere API生成总结")
+        response = requests.post(
+            'https://api.cohere.ai/v1/generate',
+            headers=headers,
+            json=data,
+            verify=False
         )
 
-        summary_text = response.generations[0].text.strip() if response.generations else "生成用户简介失败。"
-        save_user_summary_info_data(username, {"summary": summary_text})
+        if response.status_code != 200:
+            logger.error(f"Cohere API请求失败: {response.text}")
+            return None
 
-        logger.info(f"成功获取用户总结信息: {summary_text}")
-        return {"summary": summary_text}, 200
+        logger.info("成功从Cohere API获取响应")
+        return response.json()['generations'][0]['text'].strip()
 
-    except Exception as e:
-        logger.error(f"获取用户总结信息失败，用户ID: {username}, 错误: {e}")
-        return {'error': '获取用户总结信息失败'}, 500
+    @staticmethod
+    def _parse_github_stats(soup, username):
+        """解析GitHub统计数据"""
+        header_text = soup.find('text', class_='header')
+        header_text = header_text.get_text(strip=True) if header_text else "未找到 Header"
 
+        username_match = re.match(r"(.+)'s GitHub Stats", header_text)
+        extracted_username = username_match.group(1) if username_match else "未找到用户名"
 
-def get_evaluate_info(username):
-    try:
-        headers = {'User-Agent': get_random_user_agent(),
-                   'Authorization': f'token {Config.token}'
-                   } if Config.token else {}
-        result = get_github_id(username)  # 需要确保此函数已定义
-        repos = json.loads(result.get('repos_info', '[]'))
-        total_score = 0
+        logger.debug(f"正在解析用户{username}的GitHub统计数据")
+        return {
+            "username": extracted_username,
+            "rank": InfoController._extract_stat(soup, 'rank-text', 'text'),
+            "stars": InfoController._extract_stat(soup, 'Total Stars Earned:', 'next-text'),
+            "commits": InfoController._extract_stat(soup, 'Total Commits (2024):', 'next-text'),
+            "prs": InfoController._extract_stat(soup, 'Total PRs:', 'next-text'),
+            "issues": InfoController._extract_stat(soup, 'Total Issues:', 'next-text'),
+            "contributions": InfoController._extract_stat(soup, 'Contributed to (last year):', 'next-text')
+        }
 
-        for repo in repos:
-            contributors_url = GITHUB_CONTRIBUTORS_URL.format(username=username, repo=repo['name'])
-            contributors_response = requests.get(contributors_url, headers=headers)
-            contributors = contributors_response.json() if contributors_response.status_code == 200 else []
-            if len(contributors) > 1:  # 协作加分
-                total_score += 2
-
-            readme_url = repo['contents_url'].replace('{+path}', 'README.md')
-            readme_response = requests.get(readme_url, headers=headers)
-            has_readme = readme_response.status_code == 200
-            naming_convention_score = 1 if re.search(r"[A-Z][a-z]*", repo['name']) else 0
-            total_score += 1 + has_readme + naming_convention_score
-
-            commits_url = GITHUB_COMMITS_URL.format(username=username, repo=repo['name'])
-            commits_response = requests.get(commits_url, headers=headers)
-            if commits_response.status_code == 200:
-                commits = commits_response.json()
-                total_score += len(commits)
-
-        if total_score >= 90:
-            rating = "SSS"
-        elif total_score >= 80:
-            rating = "SS"
-        elif total_score >= 70:
-            rating = "S"
-        elif total_score >= 60:
-            rating = "A"
-        elif total_score >= 40:
-            rating = "B"
-        elif total_score >= 15:
-            rating = "C"
-        elif total_score >= 5:
-            rating = "D"
+    @staticmethod
+    def _extract_stat(soup, search_text, extract_type):
+        """从BeautifulSoup对象中提取统计数据"""
+        if extract_type == 'text':
+            element = soup.find('g', class_=search_text)
+            return element.find_next('text').get_text(strip=True) if element else "未找到数据"
         else:
-            rating = "F"
-        logger.info(f"用户: {username} 评价: {rating} 评分: {total_score}")
-
-        # 如果 save_evaluate_info 在项目中定义，可使用；否则用 json.dumps 代替 jsonify
-        save_evaluate_info(username, json.dumps({"evaluate": rating, "score": total_score}))
-
-        return {"evaluate": rating, "score": total_score}, 200
-
-    except requests.RequestException as e:
-        logger.error(f"请求 GitHub API 失败: {e}")
-        return {'error': '请求 GitHub API 失败'}, 500
-    except Exception as e:
-        logger.error(f"获取用户评价信息失败，用户ID: {username}, 错误: {e}")
-        return {'error': '获取用户评价信息失败'}, 500
+            element = soup.find(string=search_text)
+            return element.find_next('text').get_text(strip=True) if element else "未找到数据"
