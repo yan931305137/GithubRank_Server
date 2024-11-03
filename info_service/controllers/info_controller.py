@@ -1,9 +1,7 @@
-import re
 import langid
 import requests
 import json
 import urllib3
-from bs4 import BeautifulSoup
 
 from info_service.config.cohere_config import CohereConfig
 from info_service.config.github_token_config import Config
@@ -17,6 +15,7 @@ from info_service.utils.agent_utils import get_random_user_agent
 from info_service.config.github_config import (
     GITHUB_USER_URL, GITHUB_REPOS_URL, GITHUB_EVENTS_URL,
 )
+from info_service.utils.evaluate_utils import evaluate
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -37,7 +36,7 @@ class InfoController:
                 break
             page_data = response.json()
             if not page_data:
-                logger.info(f"已获取所有分页数据,共{page-1}页")
+                logger.info(f"已获取所有分页数据,共{page - 1}页")
                 break
             data.extend(page_data)
             logger.debug(f"成功获取第{page}页数据,数据条数:{len(page_data)}")
@@ -167,15 +166,37 @@ class InfoController:
             logger.info(f"开始猜测用户{username}的国家信息")
             result = get_github_id(username)
             user_data = json.loads(result.get('user_info', '{}'))
+            repos_data = json.loads(result.get('repos_info', '[]'))
 
-            # 检查用户位置信息
+            # 1. 首先检查用户资料中的位置信息
             location = user_data.get("location")
             if location:
                 logger.info(f"从用户资料中获取到位置信息: {location}")
                 if save_user_guess_nation_info_data(username, {"guess_nation": location}):
                     return {"guess_nation": location}, 200
 
-            # 从活动记录中获取位置信息
+            # 2. 检查README文件的语言
+            for repo in repos_data:
+                for branch in ["main", "master"]:
+                    readme_url = f"https://raw.githubusercontent.com/{username}/{repo['name']}/{branch}/README.md"
+                    try:
+                        readme_response = requests.get(readme_url)
+                        readme_response.raise_for_status()
+                        readme_content = readme_response.text
+
+                        lang, _ = langid.classify(readme_content)
+                        if lang == "zh":
+                            logger.info(f"用户{username}的README使用中文,推测来自中国")
+                            if save_user_guess_nation_info_data(username, {"guess_nation": "China"}):
+                                return {"guess_nation": "China"}, 200
+                        elif lang == "en":
+                            logger.info(f"用户{username}的README使用英文")
+                            if save_user_guess_nation_info_data(username, {"guess_nation": "English-speaking country"}):
+                                return {"guess_nation": "English-speaking country"}, 200
+                    except requests.exceptions.RequestException:
+                        continue
+
+            # 3. 从活动记录中获取位置信息
             logger.info(f"开始从用户{username}的活动记录中获取位置信息")
             events_response = requests.get(GITHUB_EVENTS_URL.format(username=username))
             events_response.raise_for_status()
@@ -183,16 +204,22 @@ class InfoController:
 
             for event in events_data:
                 if event["type"] == "PushEvent":
-                    location = InfoController._check_commit_location(event, username)
-                    if location:
-                        return location
+                    for commit in event["payload"]["commits"]:
+                        commit_url = commit["url"]
+                        commit_response = requests.get(commit_url)
+                        commit_response.raise_for_status()
+                        commit_data = commit_response.json()
 
-            # 从README中获取语言信息推测位置
-            logger.info(f"开始从用户{username}的README文件中分析语言")
-            repos_data = json.loads(result.get('repos_info', '[]'))
-            location = InfoController._check_readme_language(username, repos_data)
-            if location:
-                return location
+                        location_keywords = ["country", "city", "location"]
+                        commit_message = commit_data.get("commit", {}).get("message", "").lower()
+                        author_name = commit_data.get("commit", {}).get("author", {}).get("name", "").lower()
+                        author_email = commit_data.get("commit", {}).get("author", {}).get("email", "").lower()
+
+                        for text in [commit_message, author_name, author_email]:
+                            if any(keyword in text for keyword in location_keywords):
+                                logger.info(f"在用户{username}的提交信息中找到位置信息: {text}")
+                                if save_user_guess_nation_info_data(username, {"guess_nation": text}):
+                                    return {"guess_nation": text}, 200
 
             logger.info(f"未能找到用户{username}的位置信息")
             return {"guess_nation": "None"}, 200
@@ -221,14 +248,56 @@ class InfoController:
 
             # 生成提示信息
             logger.info(f"正在为用户{username}生成总结提示信息")
-            prompt_data = InfoController._generate_summary_prompt(user_info, most_common_language, tech_stack)
+            prompt_data = (
+                f"用户名: {user_info.get('login', '未知')}\n"
+                f"姓名: {user_info.get('name', '未知')}\n"
+                f"公司: {user_info.get('company', '未知')}\n"
+                f"博客: {user_info.get('blog', '无')}\n"
+                f"位置: {user_info.get('location', '未知')}\n"
+                f"邮箱: {user_info.get('email', '无')}\n"
+                f"是否可雇佣: {user_info.get('hireable', '未知')}\n"
+                f"简介: {user_info.get('bio', '无简介')}\n"
+                f"Twitter用户名: {user_info.get('twitter_username', '无')}\n"
+                f"公开仓库数: {user_info.get('public_repos', 0)}\n"
+                f"公开Gists数: {user_info.get('public_gists', 0)}\n"
+                f"粉丝数: {user_info.get('followers', 0)}\n"
+                f"关注数: {user_info.get('following', 0)}\n"
+                f"最常用的项目语言: {most_common_language}\n"
+                f"主要技术栈: {', '.join([tech['language'] for tech in tech_stack[:3]])}\n"
+                "以上信息是有关GitHub用户的个人信息，请以此生成一段用户介绍信息，要求300字英文！"
+            )
 
             # 调用Cohere API
             logger.info(f"开始调用Cohere API生成用户{username}的总结")
-            summary_text = InfoController._get_cohere_summary(prompt_data)
-            if not summary_text:
-                logger.error(f"为用户{username}生成总结失败")
+            headers = {
+                'Authorization': f'BEARER {CohereConfig.COHEREKEY}',
+                'Content-Type': 'application/json'
+            }
+
+            data = {
+                'model': 'command',
+                'prompt': prompt_data,
+                'max_tokens': 300,
+                'temperature': 0.7,
+                'k': 0,
+                'stop_sequences': [],
+                'return_likelihoods': 'NONE'
+            }
+
+            logger.info("开始调用Cohere API生成总结")
+            response = requests.post(
+                'https://api.cohere.ai/v1/generate',
+                headers=headers,
+                json=data,
+                verify=False
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Cohere API请求失败: {response.text}")
                 return {'error': 'Cohere API请求失败'}, 500
+
+            logger.info("成功从Cohere API获取响应")
+            summary_text = response.json()['generations'][0]['text'].strip()
 
             logger.info(f"成功生成用户{username}的总结信息")
             logger.debug(f"用户{username}的总结内容: {summary_text}")
@@ -244,156 +313,12 @@ class InfoController:
         """获取用户GitHub统计评价信息"""
         try:
             logger.info(f"开始获取用户{username}的GitHub统计评价信息")
-            url = f'https://github-readme-stats.vercel.app/api?username={username}'
-            response = requests.get(url, verify=False, timeout=10)
-
-            if response.status_code == 200:
-                svg_content = response.text
-                soup = BeautifulSoup(svg_content, 'html.parser')
-
-                stats = InfoController._parse_github_stats(soup, username)
-                logger.info(f"成功解析用户{username}的GitHub统计数据")
-                logger.debug(f"用户{username}的统计数据: {stats}")
-                save_evaluate_info(username, stats)
+            stats = evaluate(username, Config.token)
+            if save_evaluate_info(username, stats):
                 return stats, 200
-
-            logger.error(f"请求用户{username}的GitHub统计数据失败: HTTP {response.status_code}")
-            return {'error': '请求GitHub统计数据失败'}, response.status_code
+            logger.error(f"保存用户{username}的评价信息失败")
+            return {'error': '保存用户评价信息失败'}, 500
 
         except requests.RequestException as e:
             logger.error(f"请求用户{username}的GitHub统计数据失败: {str(e)}", exc_info=True)
             return {'error': '请求GitHub统计数据失败'}, 500
-        except Exception as e:
-            logger.error(f"获取用户{username}评价信息失败: {str(e)}", exc_info=True)
-            return {'error': '获取用户评价信息失败'}, 500
-
-    @staticmethod
-    def _check_commit_location(event, username):
-        """检查提交信息中的位置信息"""
-        for commit in event["payload"]["commits"]:
-            commit_url = commit["url"]
-            commit_response = requests.get(commit_url)
-            commit_response.raise_for_status()
-            commit_data = commit_response.json()
-
-            location_keywords = ["country", "city", "location"]
-            commit_message = commit_data.get("commit", {}).get("message", "").lower()
-            author_name = commit_data.get("commit", {}).get("author", {}).get("name", "").lower()
-            author_email = commit_data.get("commit", {}).get("author", {}).get("email", "").lower()
-
-            for text in [commit_message, author_name, author_email]:
-                if any(keyword in text for keyword in location_keywords):
-                    logger.info(f"在用户{username}的提交信息中找到位置信息: {text}")
-                    if save_user_guess_nation_info_data(username, {"guess_nation": text}):
-                        return {"guess_nation": text}, 200
-        return None
-
-    @staticmethod
-    def _check_readme_language(username, repos_data):
-        """检查README文件的语言"""
-        for repo in repos_data:
-            for branch in ["main", "master"]:
-                readme_url = f"https://raw.githubusercontent.com/{username}/{repo['name']}/{branch}/README.md"
-                try:
-                    readme_response = requests.get(readme_url)
-                    readme_response.raise_for_status()
-                    readme_content = readme_response.text
-
-                    lang, _ = langid.classify(readme_content)
-                    logger.debug(f"仓库{repo['name']}的README语言为: {lang}")
-                    if lang == "zh":
-                        logger.info(f"用户{username}的README使用中文,推测来自中国")
-                        if save_user_guess_nation_info_data(username, {"guess_nation": "China"}):
-                            return {"guess_nation": "China"}, 200
-                    elif lang == "en":
-                        logger.info(f"用户{username}的README使用英文")
-                        if save_user_guess_nation_info_data(username, {"guess_nation": "English-speaking country"}):
-                            return {"guess_nation": "English-speaking country"}, 200
-                except requests.exceptions.RequestException:
-                    continue
-        return None
-
-    @staticmethod
-    def _generate_summary_prompt(user_info, most_common_language, tech_stack):
-        """生成用户总结提示信息"""
-        return (
-            f"用户名: {user_info.get('login', '未知')}\n"
-            f"姓名: {user_info.get('name', '未知')}\n"
-            f"公司: {user_info.get('company', '未知')}\n"
-            f"博客: {user_info.get('blog', '无')}\n"
-            f"位置: {user_info.get('location', '未知')}\n"
-            f"邮箱: {user_info.get('email', '无')}\n"
-            f"是否可雇佣: {user_info.get('hireable', '未知')}\n"
-            f"简介: {user_info.get('bio', '无简介')}\n"
-            f"Twitter用户名: {user_info.get('twitter_username', '无')}\n"
-            f"公开仓库数: {user_info.get('public_repos', 0)}\n"
-            f"公开Gists数: {user_info.get('public_gists', 0)}\n"
-            f"粉丝数: {user_info.get('followers', 0)}\n"
-            f"关注数: {user_info.get('following', 0)}\n"
-            f"最常用的项目语言: {most_common_language}\n"
-            f"主要技术栈: {', '.join([tech['language'] for tech in tech_stack[:3]])}\n"
-            "以上信息是有关GitHub用户的个人信息，请以此生成一段用户介绍信息，要求300字英文！"
-        )
-
-    @staticmethod
-    def _get_cohere_summary(prompt_data):
-        """调用Cohere API获取总结"""
-        headers = {
-            'Authorization': f'BEARER {CohereConfig.COHEREKEY}',
-            'Content-Type': 'application/json'
-        }
-        
-        data = {
-            'model': 'command',
-            'prompt': prompt_data,
-            'max_tokens': 300,
-            'temperature': 0.7,
-            'k': 0,
-            'stop_sequences': [],
-            'return_likelihoods': 'NONE'
-        }
-
-        logger.info("开始调用Cohere API生成总结")
-        response = requests.post(
-            'https://api.cohere.ai/v1/generate',
-            headers=headers,
-            json=data,
-            verify=False
-        )
-
-        if response.status_code != 200:
-            logger.error(f"Cohere API请求失败: {response.text}")
-            return None
-
-        logger.info("成功从Cohere API获取响应")
-        return response.json()['generations'][0]['text'].strip()
-
-    @staticmethod
-    def _parse_github_stats(soup, username):
-        """解析GitHub统计数据"""
-        header_text = soup.find('text', class_='header')
-        header_text = header_text.get_text(strip=True) if header_text else "未找到 Header"
-
-        username_match = re.match(r"(.+)'s GitHub Stats", header_text)
-        extracted_username = username_match.group(1) if username_match else "未找到用户名"
-
-        logger.debug(f"正在解析用户{username}的GitHub统计数据")
-        return {
-            "username": extracted_username,
-            "rank": InfoController._extract_stat(soup, 'rank-text', 'text'),
-            "stars": InfoController._extract_stat(soup, 'Total Stars Earned:', 'next-text'),
-            "commits": InfoController._extract_stat(soup, 'Total Commits (2024):', 'next-text'),
-            "prs": InfoController._extract_stat(soup, 'Total PRs:', 'next-text'),
-            "issues": InfoController._extract_stat(soup, 'Total Issues:', 'next-text'),
-            "contributions": InfoController._extract_stat(soup, 'Contributed to (last year):', 'next-text')
-        }
-
-    @staticmethod
-    def _extract_stat(soup, search_text, extract_type):
-        """从BeautifulSoup对象中提取统计数据"""
-        if extract_type == 'text':
-            element = soup.find('g', class_=search_text)
-            return element.find_next('text').get_text(strip=True) if element else "未找到数据"
-        else:
-            element = soup.find(string=search_text)
-            return element.find_next('text').get_text(strip=True) if element else "未找到数据"
