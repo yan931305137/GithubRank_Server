@@ -4,13 +4,15 @@ CREATE DATABASE IF NOT EXISTS github_rank;
 -- 使用数据库
 USE github_rank;
 
--- 创建 user 表
-CREATE TABLE IF NOT EXISTS user (
+-- 创建 users 表
+CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '用户 ID',
-    username VARCHAR(255) NOT NULL COMMENT '用户名',
+    username VARCHAR(255) NOT NULL UNIQUE COMMENT '用户名',
     password VARCHAR(255) NOT NULL COMMENT '密码',
-    email VARCHAR(255) DEFAULT NULL COMMENT '邮箱',
-    github_id VARCHAR(255) COMMENT 'GitHub 用户 ID',
+    email VARCHAR(255) DEFAULT NULL UNIQUE COMMENT '邮箱',
+    github_id VARCHAR(255) UNIQUE COMMENT 'GitHub 用户 ID',
+    status TINYINT DEFAULT 1 COMMENT '用户状态：1-正常，0-禁用',
+    last_login_at DATETIME COMMENT '最后登录时间',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
@@ -39,9 +41,11 @@ CREATE TABLE IF NOT EXISTS appraisal (
     message TEXT COMMENT '评价内容',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    UNIQUE KEY unique_github_user (user_id, github_id), -- 防止相同 user_id 和 github_id 的重复记录
-    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE -- 外键约束，引用 user 表的 id 列，且启用级联删除
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户评价表';
+    UNIQUE KEY unique_github_user (user_id, github_id) USING BTREE, -- 添加 USING BTREE 以优化索引
+    INDEX idx_github_id (github_id) USING BTREE, -- 添加 github_id 的索引
+    INDEX idx_user_id (user_id) USING BTREE,     -- 添加 user_id 的索引
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 ROW_FORMAT=DYNAMIC COMMENT='用户评价表';
 
 -- 创建 weekly_recommend 表
 CREATE TABLE IF NOT EXISTS weekly_recommend (

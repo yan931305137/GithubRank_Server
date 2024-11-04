@@ -162,6 +162,7 @@ def repos_info():
     logger.info(f"获取用户项目信息请求处理完毕，github_id: {github_id}")
     return jsonify(response[0]), response[1]
 
+
 @info_bp.route('/techInfo', methods=['GET'])
 @swag_from({
     'tags': ['信息服务'],
@@ -395,3 +396,60 @@ def get_evaluate():
         return jsonify({"detail": "服务器内部错误"}), 500
 
 
+@info_bp.route('/total', methods=['GET'])
+@swag_from({
+    'tags': ['信息服务'],
+    'parameters': [
+        {
+            'name': 'github_id',
+            'in': 'query',
+            'required': True,
+            'type': 'string',
+            'description': 'GitHub 用户ID'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': '获取用户项目信息成功',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'repo_name': {
+                        'type': 'string',
+                        'example': 'example_repo'
+                    },
+                    'stars': {
+                        'type': 'integer',
+                        'example': 100
+                    }
+                }
+            }
+        },
+        400: {
+            'description': '缺少github_id参数',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'detail': {
+                        'type': 'string',
+                        'example': '缺少github_id参数'
+                    }
+                }
+            }
+        }
+    }
+})
+def total_info():
+    """
+    获取单个github用户项目信息
+    :return: 响应数据
+    """
+    github_id = request.args.get('github_id')
+    if not github_id:
+        logger.error(request.path)
+        return jsonify({"detail": "缺少github_id参数"}), 400
+
+    logger.info(f"获取用户项目信息请求已收到，github_id: {github_id}")
+    response = InfoController.get_user_total_info(github_id)
+    logger.info(f"获取用户项目信息请求处理完毕，github_id: {github_id}")
+    return jsonify(response[0]), response[1]

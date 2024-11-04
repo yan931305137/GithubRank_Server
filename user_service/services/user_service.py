@@ -56,7 +56,7 @@ def check_user_credentials(username, password):
     :return: 如果凭证有效则返回True，否则返回False
     """
     with get_cursor(dictionary=True) as cursor:
-        cursor.execute("SELECT * FROM user WHERE username = %s", (username,))
+        cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
         user = cursor.fetchone()
     if user and decrypt_password(user['password']) == password:
         logger.info(f"用户 {username} 凭证验证成功")
@@ -76,14 +76,14 @@ def create_user(username, password_hash):
     with get_cursor(dictionary=True) as cursor:
         try:
             # 检查用户名是否存在
-            cursor.execute("SELECT * FROM user WHERE username = %s", (username,))
+            cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
             user = cursor.fetchone()
             if user:
                 logger.warning(f"尝试创建已存在的用户 {username}")
                 raise ValueError("用户已存在")
 
             # 添加用户
-            cursor.execute("INSERT INTO user (username, password) VALUES (%s, %s)", (username, password_hash))
+            cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username, password_hash))
             connection.commit()
             logger.info(f"用户 {username} 创建成功")
         except mysql.connector.Error as err:
@@ -100,7 +100,7 @@ def delete_user_by_id(user_id):
     """
     with get_cursor(dictionary=True) as cursor:
         try:
-            cursor.execute("DELETE FROM user WHERE id = %s", (user_id,))
+            cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
             if cursor.rowcount == 0:
                 logger.warning(f"尝试删除不存在的用户 ID {user_id}")
                 raise ValueError("用户未找到")
@@ -120,7 +120,7 @@ def get_user_by_id(user_id):
     :return: 用户信息字典
     """
     with get_cursor(dictionary=True) as cursor:
-        cursor.execute("SELECT * FROM user WHERE id = %s", (user_id,))
+        cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
         user = cursor.fetchone()
     if user:
         logger.info(f"获取用户 ID {user_id} 信息成功")
@@ -139,7 +139,7 @@ def service_update_user_by_id(user_id, data):
     with get_cursor(dictionary=True) as cursor:
         try:
             # 检查用户是否存在
-            cursor.execute("SELECT * FROM user WHERE id = %s", (user_id,))
+            cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
             user = cursor.fetchone()
             if not user:
                 logger.warning(f"尝试更新不存在的用户 ID {user_id}")
@@ -148,7 +148,7 @@ def service_update_user_by_id(user_id, data):
             # 更新用户信息
             update_fields = ", ".join(f"{key} = %s" for key in data.keys())
             update_values = list(data.values()) + [user_id]
-            cursor.execute(f"UPDATE user SET {update_fields} WHERE id = %s", update_values)
+            cursor.execute(f"UPDATE users SET {update_fields} WHERE id = %s", update_values)
             connection.commit()
             logger.info(f"用户 ID {user_id} 信息更新成功")
         except mysql.connector.Error as err:
@@ -163,7 +163,7 @@ def save_user_appraisal(username, github_id, message, point):
             # 查询 user_id
             cursor.execute(
                 """
-                SELECT id FROM user WHERE username = %s
+                SELECT id FROM users WHERE username = %s
                 """,
                 (username,)
             )
@@ -175,14 +175,38 @@ def save_user_appraisal(username, github_id, message, point):
 
             user_id = user['id']
 
-            # 插入评价数据
+            # 检查是否已存在评价
             cursor.execute(
                 """
-                INSERT INTO appraisal (user_id, github_id, rating, message)
-                VALUES (%s, %s, %s, %s)
+                SELECT id FROM appraisal 
+                WHERE user_id = %s AND github_id = %s
                 """,
-                (user_id, github_id, point, message)
+                (user_id, github_id)
             )
+            existing_appraisal = cursor.fetchone()
+
+            if existing_appraisal:
+                # 更新现有评价
+                cursor.execute(
+                    """
+                    UPDATE appraisal 
+                    SET rating = %s, message = %s 
+                    WHERE user_id = %s AND github_id = %s
+                    """,
+                    (point, message, user_id, github_id)
+                )
+                logger.info(f"更新用户 {username} 对 {github_id} 的评价")
+            else:
+                # 插入新评价
+                cursor.execute(
+                    """
+                    INSERT INTO appraisal (user_id, github_id, rating, message)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (user_id, github_id, point, message)
+                )
+                logger.info(f"添加用户 {username} 对 {github_id} 的新评价")
+
             connection.commit()
         return True
     except Exception as e:

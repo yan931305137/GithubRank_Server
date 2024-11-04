@@ -137,7 +137,7 @@ def save_appraisal(username, data):
         # 获取数据中的必要字段
         github_id = data.get('github_id')
         message = data.get('message')
-        point = data.get('point')
+        point = data.get('number')
 
         # 检查必要字段是否存在
         if not all([github_id, message, point]):
@@ -149,7 +149,7 @@ def save_appraisal(username, data):
 
         if result:
             logger.info("评估数据保存成功")
-            return {'message': '评估数据保存成功'}, 201
+            return {'message': '评估数据保存成功'}, 200
         else:
             logger.error("评估数据保存失败，可能是用户不存在")
             return {'error': '评估数据保存失败'}, 400
@@ -162,13 +162,42 @@ def save_appraisal(username, data):
 def get_appraisals(github_id):
     """
     获取用户的所有评估。
-    :param github_id:
+    :param github_id: GitHub用户ID
+    :return: 包含评估列表、平均分和评估数量的字典
     """
     try:
         logger.info(f"开始获取用户评估，用户ID: {github_id}")
         appraisals = get_user_appraisals(github_id)
         logger.info(f"成功获取用户评估: {appraisals}")
-        return appraisals, 200
+
+        # 计算平均分和各分数的数量
+        if appraisals:
+            ratings = [appraisal['rating'] for appraisal in appraisals]
+            average = sum(ratings) / len(ratings)
+            
+            # 统计各分数的数量
+            count = {
+                '1': ratings.count(1),
+                '2': ratings.count(2), 
+                '3': ratings.count(3),
+                '4': ratings.count(4),
+                '5': ratings.count(5)
+            }
+        else:
+            average = 0
+            count = {
+                '1': 0,
+                '2': 0,
+                '3': 0, 
+                '4': 0,
+                '5': 0
+            }
+
+        return {
+            "appraisals": appraisals,
+            "average": round(average, 1),
+            "count": count
+        }, 200
     except Exception as e:
         logger.error(f"获取用户评估失败，用户ID: {github_id}, 错误: {e}")
         return {'error': '获取用户评估失败'}, 500

@@ -1,6 +1,10 @@
+import json
+import re
+import urllib.parse
+
 from flasgger import Swagger, swag_from
 
-from flask import jsonify, request, Blueprint
+from flask import jsonify, request, Blueprint, session
 
 from user_service.utils.logger_utils import logger
 
@@ -162,7 +166,6 @@ def register():
 
 
 @user_bp.route('/delete', methods=['DELETE'])
-@token_required
 @swag_from({
     'tags': ['用户管理'],
     'parameters': [
@@ -229,7 +232,6 @@ def delete_user():
 
 
 @user_bp.route('/get', methods=['GET'])
-@token_required
 @swag_from({
     'tags': ['用户管理'],
     'parameters': [
@@ -317,7 +319,6 @@ def get_user():
 
 
 @user_bp.route('/update', methods=['PUT'])
-@token_required
 @swag_from({
     'tags': ['用户管理'],
     'parameters': [
@@ -438,7 +439,6 @@ def update_user():
 
 
 @user_bp.route('/appraise', methods=['POST'])
-@token_required
 @swag_from({
     'tags': ['用户评价'],
     'parameters': [
@@ -513,22 +513,61 @@ def update_user():
     }
 })
 def appraise():
-    token = request.headers.get('Authorization')
-    if not token:
-        logger.warning(f"请求路径: {request.url} - 缺少 Authorization token")
-        return jsonify({"error": "缺少 Authorization token"}), 401
+    try:
+        user_info = request.cookies.get('user_info')
+        if not user_info:
+            logger.warning("用户未登录")
+            return jsonify({"error": "请先登录"}), 401
 
-    ver, err = jwt_manager.verify_token(token)
-    username = ver.get('username')
-    if err:
-        logger.warning(f"无效的 Authorization token")
-        return jsonify({"error": "无效的 Authorization token"}), 403
+        user_info = urllib.parse.unquote(user_info)
+        pattern = r'"login":"(.*?)"'
+        username = None
+        match = re.search(pattern, user_info)
+        if match:
+            username = match.group(1)
 
-    data = request.json
-    logger.info(f"用户评价请求已收到，数据: {username, data}")
-    response = save_appraisal(username, data)
-    logger.info("用户评价请求处理完毕")
-    return jsonify(response[0]), response[1]
+        if not username:
+            logger.warning("无法获取用户名")
+            return jsonify({"error": "无法获取用户名"}), 401
+
+        # 注册用户
+        data = {
+            "username": username,
+            "password": username
+        }
+        response = register_user(data)
+
+        data = request.json
+        if not data:
+            logger.warning("缺少评价数据")
+            return jsonify({"error": "缺少评价数据"}), 400
+
+        # 验证评价数据
+        score = data.get('number')
+        comment = data.get('message')
+
+        if score is None or not isinstance(score, int) or score < 1 or score > 5:
+            logger.warning(f"无效的评分: {score}")
+            return jsonify({"error": "评分必须是1-5之间的整数"}), 400
+
+        if not comment or not isinstance(comment, str):
+            logger.warning("无效的评价内容")
+            return jsonify({"error": "评价内容不能为空"}), 400
+
+        # 保存评价
+        logger.info(f"用户评价请求已收到，用户: {username}, 数据: {data}")
+        response = save_appraisal(username, data)
+
+        if response[1] != 200:
+            logger.error(f"保存评价失败: {response[0]}")
+            return jsonify(response[0]), response[1]
+
+        logger.info("用户评价保存成功")
+        return jsonify({"message": "评价成功"}), 200
+
+    except Exception as e:
+        logger.error(f"处理评价请求时发生错误: {str(e)}")
+        return jsonify({"error": "服务器内部错误"}), 500
 
 
 @user_bp.route('/getAppraise', methods=['GET'])
@@ -598,7 +637,7 @@ def get_appraise():
     try:
         response_data = get_appraisals(github_id)
         logger.info(f"获取用户评价请求处理完毕，user: {github_id}")
-        return jsonify(response_data[0])
+        return jsonify(response_data[0]),200
     except Exception as e:
         logger.error(f"获取用户评价时发生错误，user: {github_id}，错误信息: {str(e)}")
         return jsonify({"error": "服务器内部错误"}), 500
