@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import json
+from datetime import datetime
 
 from info_service.config.db_config import Config
 from info_service.utils.logger_utils import logger
@@ -61,11 +62,18 @@ def get_github_id(github_id):
     :return: 查询结果,成功返回用户信息,失败返回False,未找到返回None
     """
     try:
-        query = "SELECT * FROM github WHERE github_id = %s"
+        query = "SELECT * FROM Github WHERE github_id = %s"
         with get_cursor(dictionary=True) as cursor:
             cursor.execute(query, (github_id,))
             result = cursor.fetchone()
-            return result if result else None
+            if result:
+                # 遍历 result 字典，将 datetime 对象转为字符串
+                for key, value in result.items():
+                    if isinstance(value, datetime):
+                        result[key] = value.isoformat()  # 转为字符串格式
+                return json.dumps(result, ensure_ascii=False)
+            else:
+                return None
     except Exception as e:
         logger.error(f"查询github_id失败: {e}")
         return False
@@ -87,7 +95,7 @@ def get_rank_data():
         with get_cursor(dictionary=True) as cursor:
             cursor.execute(query)
             results = cursor.fetchall()
-            
+
         rank_data = {
             'top_users': [
                 {
@@ -152,6 +160,24 @@ def save_user_reops_data(info_id, user_repos_data):
         return False
 
 
+def save_user_issues_data(info_id, issues):
+    try:
+        query = """
+               INSERT INTO github (github_id, issues_info, updated_at)
+               VALUES (%s, %s, NOW())
+               ON DUPLICATE KEY UPDATE 
+                   issues_info = %s,
+                   updated_at = NOW()
+           """
+        issues_data_json = json.dumps(issues)
+        with get_cursor() as cursor:
+            cursor.execute(query, (info_id, issues_data_json, issues_data_json))
+        return True
+    except Exception as e:
+        logger.error(f"保存用户仓库数据失败: {e}")
+        return False
+
+
 def save_user_tech_info_data(info_id, tech_stack):
     """
     保存用户技术栈信息
@@ -168,7 +194,7 @@ def save_user_tech_info_data(info_id, tech_stack):
                 updated_at = NOW()
         """
         tech_stack_json = json.dumps(tech_stack)
-        with get_cursor() as cursor:
+        with get_cursor(False) as cursor:
             cursor.execute(query, (info_id, tech_stack_json, tech_stack_json))
         return True
     except Exception as e:
@@ -192,7 +218,7 @@ def save_user_guess_nation_info_data(info_id, most_common_language):
                 updated_at = NOW()
         """
         language_json = json.dumps(most_common_language)
-        with get_cursor() as cursor:
+        with get_cursor(False) as cursor:
             cursor.execute(query, (info_id, language_json, language_json))
         return True
     except Exception as e:
@@ -216,7 +242,7 @@ def save_evaluate_info(info_id, evaluate):
                 updated_at = NOW()
         """
         evaluate_json = json.dumps(evaluate)
-        with get_cursor() as cursor:
+        with get_cursor(False) as cursor:
             cursor.execute(query, (info_id, evaluate_json, evaluate_json))
         return True
     except Exception as e:
@@ -240,7 +266,7 @@ def save_user_summary_info_data(info_id, summa):
                 updated_at = NOW()
         """
         summa_json = json.dumps(summa)
-        with get_cursor() as cursor:
+        with get_cursor(False) as cursor:
             cursor.execute(query, (info_id, summa_json, summa_json))
         return True
     except Exception as e:

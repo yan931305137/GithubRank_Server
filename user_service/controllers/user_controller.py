@@ -3,6 +3,7 @@ from user_service.services.user_service import (check_user_credentials,
                                                 delete_user_by_id as service_delete_user_by_id,
                                                 get_user_by_id as service_get_user_by_id,
                                                 service_update_user_by_id, get_user_appraisals, save_user_appraisal)
+from user_service.utils.check_sensitive_utils import check_sensitive_words
 from user_service.utils.cryp_utils import encrypt_password
 from user_service.utils.jwt_utils import jwt_manager
 from user_service.utils.logger_utils import logger
@@ -137,15 +138,21 @@ def save_appraisal(username, data):
         # 获取数据中的必要字段
         github_id = data.get('github_id')
         message = data.get('message')
-        point = data.get('number')
+        number = data.get('number')
+        avatar_url = data.get('avatar_url')
 
         # 检查必要字段是否存在
-        if not all([github_id, message, point]):
+        if not all([github_id, message, number]):
             logger.error("评估数据缺失必要字段")
             return {'error': '评估数据缺失必要字段'}, 400
 
+        # 检查message中的敏感词
+        if check_sensitive_words(message):
+            logger.error("评价数据包含敏感词")
+            return {'error': '评价数据包含敏感词'}, 400
+
         # 调用保存函数
-        result = save_user_appraisal(username, github_id, message, point)
+        result = save_user_appraisal(username, github_id, message, number, avatar_url)
 
         if result:
             logger.info("评估数据保存成功")
@@ -159,42 +166,36 @@ def save_appraisal(username, data):
         return {'error': '服务器内部错误'}, 500
 
 
-def get_appraisals(github_id):
+def get_appraisals(github_id, pagesize, curpage):
     """
     获取用户的所有评估。
+    :param curpage:
+    :param pagesize:
     :param github_id: GitHub用户ID
     :return: 包含评估列表、平均分和评估数量的字典
     """
     try:
         logger.info(f"开始获取用户评估，用户ID: {github_id}")
-        appraisals = get_user_appraisals(github_id)
-        logger.info(f"成功获取用户评估: {appraisals}")
+        appraisals_data = get_user_appraisals(github_id, pagesize, curpage)
+        logger.info(f"成功获取用户评估: {appraisals_data}")
 
-        # 计算平均分和各分数的数量
-        if appraisals:
-            ratings = [appraisal['rating'] for appraisal in appraisals]
+        if not appraisals_data:
+            return {'error': '获取用户评估失败'}, 500
+
+        appraisals_list = appraisals_data['list']
+        total = appraisals_data['total']
+        count = appraisals_data['count']
+
+        # 计算平均分
+        if appraisals_list:
+            ratings = [appraisal['rating'] for appraisal in appraisals_list]
             average = sum(ratings) / len(ratings)
-            
-            # 统计各分数的数量
-            count = {
-                '1': ratings.count(1),
-                '2': ratings.count(2), 
-                '3': ratings.count(3),
-                '4': ratings.count(4),
-                '5': ratings.count(5)
-            }
         else:
             average = 0
-            count = {
-                '1': 0,
-                '2': 0,
-                '3': 0, 
-                '4': 0,
-                '5': 0
-            }
 
         return {
-            "appraisals": appraisals,
+            "total": total,
+            "list": appraisals_list,
             "average": round(average, 1),
             "count": count
         }, 200

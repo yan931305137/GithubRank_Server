@@ -15,7 +15,6 @@ connection = MySQLPool(
 ).get_connection()
 
 
-
 def ensure_connection():
     """
     确保数据库连接是有效的，如果无效则重新连接。
@@ -157,7 +156,7 @@ def service_update_user_by_id(user_id, data):
             raise ValueError("更新用户信息失败: {}".format(err))
 
 
-def save_user_appraisal(username, github_id, message, point):
+def save_user_appraisal(username, github_id, message, number, avatar_url):
     try:
         with get_cursor(dictionary=True) as cursor:
             # 查询 user_id
@@ -190,20 +189,20 @@ def save_user_appraisal(username, github_id, message, point):
                 cursor.execute(
                     """
                     UPDATE appraisal 
-                    SET rating = %s, message = %s 
+                    SET rating = %s, message = %s,avatar_url = %s
                     WHERE user_id = %s AND github_id = %s
                     """,
-                    (point, message, user_id, github_id)
+                    (number, message, avatar_url, user_id, github_id)
                 )
                 logger.info(f"更新用户 {username} 对 {github_id} 的评价")
             else:
                 # 插入新评价
                 cursor.execute(
                     """
-                    INSERT INTO appraisal (user_id, github_id, rating, message)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO appraisal (user_id, github_id, rating, message,avatar_url)
+                    VALUES (%s, %s, %s, %s,%s)
                     """,
-                    (user_id, github_id, point, message)
+                    (user_id, github_id, number, message, avatar_url)
                 )
                 logger.info(f"添加用户 {username} 对 {github_id} 的新评价")
 
@@ -214,17 +213,61 @@ def save_user_appraisal(username, github_id, message, point):
         return False
 
 
-def get_user_appraisals(github_id):
+def get_user_appraisals(github_id, pagesize, curpage):
+    """获取用户评价列表
+    
+    Args:
+        github_id: GitHub ID
+        pagesize: 每页数量 
+        curpage: 当前页码
+        
+    Returns:
+        dict: 包含评价列表和总数的字典
+    """
     try:
         with get_cursor(dictionary=True) as cursor:
+            # 获取总数
             cursor.execute(
                 """
-                SELECT * FROM appraisal WHERE github_id = %s
+                SELECT COUNT(*) as total FROM appraisal WHERE github_id = %s
                 """,
                 (github_id,)
             )
+            total = cursor.fetchone()['total']
+
+            # 分页查询
+            offset = (curpage - 1) * pagesize
+            cursor.execute(
+                """
+                SELECT a.*, u.username 
+                FROM appraisal a
+                LEFT JOIN users u ON a.user_id = u.id
+                WHERE a.github_id = %s
+                ORDER BY a.created_at DESC
+                LIMIT %s OFFSET %s
+                """,
+                (github_id, pagesize, offset)
+            )
             appraisals = cursor.fetchall()
-        return appraisals
+
+            # 获取所有评分并统计总数量
+            cursor.execute(
+                """
+                SELECT rating, COUNT(*) as count FROM appraisal WHERE github_id = %s GROUP BY rating
+                """,
+                (github_id,)
+            )
+            ratings_count = cursor.fetchall()
+            count = {str(i): 0 for i in range(1, 6)}
+            for row in ratings_count:
+                count[str(row['rating'])] = row['count']
+
+            return {
+                'total': total,
+                'list': appraisals,
+                'count': count  
+            }
+
     except Exception as e:
-        logger.error(f"获取用户评估数据失败: {e}")
+        logger.error(f"获取用户评价数据失败: {e}")
         return None

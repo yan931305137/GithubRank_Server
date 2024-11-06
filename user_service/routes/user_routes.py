@@ -1,4 +1,3 @@
-import json
 import re
 import urllib.parse
 
@@ -519,10 +518,14 @@ def appraise():
             logger.warning("用户未登录")
             return jsonify({"error": "请先登录"}), 401
 
-        user_info = urllib.parse.unquote(user_info)
-        pattern = r'"login":"(.*?)"'
+        print(user_info)
+
+        # 解码 URL 编码的字符串
+        decoded_user_info = urllib.parse.unquote(user_info)
+        
+        pattern = r'"login":"(.*?)"'        
         username = None
-        match = re.search(pattern, user_info)
+        match = re.search(pattern, decoded_user_info)
         if match:
             username = match.group(1)
 
@@ -580,23 +583,47 @@ def appraise():
             'required': True,
             'type': 'string',
             'description': 'GitHub 用户ID'
+        },
+        {
+            'name': 'pagesize',
+            'in': 'query',
+            'required': False,
+            'type': 'integer',
+            'description': '每页数量,默认20'
+        },
+        {
+            'name': 'curpage',
+            'in': 'query', 
+            'required': False,
+            'type': 'integer',
+            'description': '当前页码,默认1'
         }
     ],
     'responses': {
         200: {
             'description': '返回用户的评价列表',
             'schema': {
-                'type': 'array',
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                        'score': {
-                            'type': 'integer',
-                            'example': 5
-                        },
-                        'comment': {
-                            'type': 'string',
-                            'example': '非常优秀的项目'
+                'type': 'object',
+                'properties': {
+                    'total': {
+                        'type': 'integer',
+                        'description': '总记录数',
+                        'example': 100
+                    },
+                    'data': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'score': {
+                                    'type': 'integer',
+                                    'example': 5
+                                },
+                                'comment': {
+                                    'type': 'string',
+                                    'example': '非常优秀的项目'
+                                }
+                            }
                         }
                     }
                 }
@@ -634,10 +661,17 @@ def get_appraise():
         logger.error(f"请求路径: {request.url} - 缺少 github_id 参数")
         return jsonify({"error": "缺少 github_id 参数"}), 400
 
+    # 获取分页参数
+    pagesize = int(request.args.get('pagesize', 20))
+    curpage = int(request.args.get('curpage', 1))
+
     try:
-        response_data = get_appraisals(github_id)
+        response_data = get_appraisals(github_id,pagesize,curpage)
+        if response_data[1] != 200:
+            return jsonify(response_data[0]), response_data[1]
+
         logger.info(f"获取用户评价请求处理完毕，user: {github_id}")
-        return jsonify(response_data[0]),200
+        return response_data[0], 200
     except Exception as e:
         logger.error(f"获取用户评价时发生错误，user: {github_id}，错误信息: {str(e)}")
         return jsonify({"error": "服务器内部错误"}), 500

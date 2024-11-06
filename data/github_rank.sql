@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS Github (
     github_id VARCHAR(255) NOT NULL UNIQUE COMMENT 'GitHub用户的唯一标识符，不能为空',
     user_info JSON COMMENT '用户详细信息，存储为JSON格式',
     repos_info JSON COMMENT '用户仓库信息，存储为JSON格式',
+    issues_info JSON COMMENT '信息，存储为JSON格式',
     tech_stack JSON COMMENT '用户技术栈信息，存储为JSON格式',
     most_common_language VARCHAR(255) COMMENT '用户最常用的编程语言，最大长度255字符',
     total JSON COMMENT '用户的总计信息，存储为JSON格式',
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS appraisal (
     github_id VARCHAR(255) NOT NULL COMMENT 'GitHub ID',
     rating TINYINT NOT NULL CHECK (rating BETWEEN 1 AND 10) COMMENT '评分（1-10）',
     message TEXT COMMENT '评价内容',
+    avatar_url VARCHAR(255) COMMENT '用户头像URL',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     UNIQUE KEY unique_github_user (user_id, github_id) USING BTREE, -- 添加 USING BTREE 以优化索引
