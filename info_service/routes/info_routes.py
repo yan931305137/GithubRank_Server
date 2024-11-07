@@ -522,7 +522,7 @@ def total_info():
     return jsonify(response[0]), response[1]
 
 
-@info_bp.route('/search', methods=['GET'])
+@info_bp.route('/search', methods=['POST'])
 @swag_from({
     'tags': ['信息服务'],
     'parameters': [
@@ -635,7 +635,7 @@ def search():
     techs = request.json.get('techs')
 
     logger.info(f"搜索请求已收到，keyword: {keyword}, language: {target_language}, techs: {techs}")
-    response = run_actor(keyword, nation, target_language, techs, 80, curpage, pagesize * 10)
+    response = run_actor(keyword, nation, target_language, techs, 80, curpage, pagesize)
     logger.info(f"搜索请求处理完毕，keyword: {keyword}")
 
     print(response)
