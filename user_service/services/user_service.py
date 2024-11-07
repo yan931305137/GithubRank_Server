@@ -215,14 +215,14 @@ def save_user_appraisal(username, github_id, message, number, avatar_url):
 
 def get_user_appraisals(github_id, pagesize, curpage):
     """获取用户评价列表
-    
+
     Args:
         github_id: GitHub ID
-        pagesize: 每页数量 
+        pagesize: 每页数量
         curpage: 当前页码
-        
+
     Returns:
-        dict: 包含评价列表和总数的字典
+        dict: 包含评价列表、总数和总平均值的字典
     """
     try:
         with get_cursor(dictionary=True) as cursor:
@@ -262,10 +262,24 @@ def get_user_appraisals(github_id, pagesize, curpage):
             for row in ratings_count:
                 count[str(row['rating'])] = row['count']
 
+            # 获取总平均分
+            cursor.execute(
+                """
+                SELECT AVG(rating) as average FROM appraisal WHERE github_id = %s
+                """,
+                (github_id,)
+            )
+            avg_rating = cursor.fetchone()['average']
+            avg_rating = avg_rating if avg_rating is not None else 0  # 如果没有评价数据，返回0
+
+            # 四舍五入保留一位小数
+            avg_rating = round(avg_rating, 1)
+
             return {
                 'total': total,
                 'list': appraisals,
-                'count': count  
+                'count': count,
+                'average': avg_rating  # 返回总平均分
             }
 
     except Exception as e:

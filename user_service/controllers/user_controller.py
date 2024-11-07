@@ -185,18 +185,12 @@ def get_appraisals(github_id, pagesize, curpage):
         appraisals_list = appraisals_data['list']
         total = appraisals_data['total']
         count = appraisals_data['count']
-
-        # 计算平均分
-        if appraisals_list:
-            ratings = [appraisal['rating'] for appraisal in appraisals_list]
-            average = sum(ratings) / len(ratings)
-        else:
-            average = 0
+        average = appraisals_data['average']
 
         return {
             "total": total,
             "list": appraisals_list,
-            "average": round(average, 1),
+            "average": average,
             "count": count
         }, 200
     except Exception as e:
