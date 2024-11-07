@@ -631,10 +631,11 @@ def search():
     curpage = int(request.args.get('curpage', 1))
 
     target_language = request.json.get('target_language')
+    nation = request.json.get('nation')
     techs = request.json.get('techs')
 
     logger.info(f"搜索请求已收到，keyword: {keyword}, language: {target_language}, techs: {techs}")
-    response = run_actor(keyword, target_language, techs, 80, curpage, pagesize * 10)
+    response = run_actor(keyword, nation, target_language, techs, 80, curpage, pagesize * 10)
     logger.info(f"搜索请求处理完毕，keyword: {keyword}")
 
     print(response)

@@ -4,7 +4,7 @@ from info_service.config.github_token_config import Config
 from info_service.config.apify_config import ApifyConfig
 
 
-def run_actor(search_query, target_language, techs, confidence_threshold, page, per_page):
+def run_actor(search_query, nation, target_language, techs, confidence_threshold, page, per_page):
     run_input = {
         "confidence_threshold": confidence_threshold,
         "github_token": Config.token,
@@ -14,6 +14,7 @@ def run_actor(search_query, target_language, techs, confidence_threshold, page, 
             "useApifyProxy": True
         },
         "search_query": search_query,
+        "nation": nation,
         "startUrls": [
             {
                 "url": "https://apify.com",

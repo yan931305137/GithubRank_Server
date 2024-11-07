@@ -3,16 +3,15 @@ from flask import jsonify, request, Blueprint
 
 from gateway_service.controllers.gateway_controller import forward_request, forward_recommend_request
 
-gateway_bp = Blueprint('gateway', __name__)  # 使用 Blueprint 而不是 Flask
+# 定义网关服务的蓝图
+gateway_bp = Blueprint('gateway', __name__)
 
-
-# 在主应用中注册蓝图
+# 注册网关蓝图到应用
 def register_gateway_blueprint(app):
     app.register_blueprint(gateway_bp)
     Swagger(app)
 
-
-# 对 /user/<path:path> 的请求转发到用户服务
+# 定义路由到用户服务的函数
 @gateway_bp.route('/user/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @swag_from({
     'tags': ['网关服务'],
@@ -42,14 +41,19 @@ def register_gateway_blueprint(app):
     }
 })
 def route_to_user_service(path):
+    """
+    转发请求到用户服务
+    :param path: 用户服务的路径
+    """
     try:
+        # 调用forward_request函数转发请求到用户服务
         response = forward_request('user', path)
         return response
     except Exception as e:
+        # 如果发生异常，返回错误信息和状态码500
         return jsonify(str(e)), 500
 
-
-# 对 /info/<path:path> 的请求转发到信息服务
+# 定义路由到信息服务的函数
 @gateway_bp.route('/info/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @swag_from({
     'tags': ['网关服务'],
@@ -79,14 +83,19 @@ def route_to_user_service(path):
     }
 })
 def route_to_info_service(path):
+    """
+    转发请求到信息服务
+    :param path: 信息服务的路径
+    """
     try:
+        # 调用forward_request函数转发请求到信息服务
         response = forward_request('info', path)
         return response
     except Exception as e:
+        # 如果发生异常，返回错误信息和状态码500
         return jsonify(str(e)), 500
 
-
-# 对 /recommend/<path:path> 的请求转发到信息服务
+# 定义路由到推荐服务的函数
 @gateway_bp.route('/recommend', methods=['GET', 'POST', 'PUT', 'DELETE'])
 @swag_from({
     'tags': ['网关服务'],
@@ -116,11 +125,14 @@ def route_to_info_service(path):
     }
 })
 def route_to_recommend_service():
+    """
+    转发请求到推荐服务
+    """
     try:
+        # 调用forward_recommend_request函数转发请求到推荐服务
         response = forward_recommend_request('recommend')
-        print(response)
+        print(response)  # 打印响应内容
         return response
     except Exception as e:
+        # 如果发生异常，返回错误信息和状态码500
         return jsonify(str(e)), 500
-
-

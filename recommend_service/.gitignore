@@ -1,7 +1,4 @@
-venv/
 log/
 test/
 *_pycache_/
 nacos-data/
-config/github_token_config.py
-config/cohere_config.py

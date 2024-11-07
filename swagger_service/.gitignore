@@ -1,7 +1,4 @@
-.venv/
 .log/
 __pycache__/
 .idea/
-docker-compose.yml
-result.json
 test/

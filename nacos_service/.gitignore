@@ -1,10 +1,5 @@
-.venv/
 log/
 test/
 __pycache__/
 .idea/
-github.py
-docker-compose.yml
-result.json
-data/
 nacos-data/
